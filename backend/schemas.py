@@ -28,17 +28,6 @@ class AuthResponse(BaseModel):
     token: str
 
 
-class MoveCardRequest(BaseModel):
-    activeId: str
-    overId: str
-
-
-class AddCardRequest(BaseModel):
-    title: str
-    details: str
-    columnId: str
-
-
 class AIRequest(BaseModel):
     prompt: str
 

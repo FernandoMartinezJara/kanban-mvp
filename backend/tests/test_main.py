@@ -50,6 +50,22 @@ def test_put_kanban_updates_board(tmp_path, monkeypatch):
     assert saved == {"columns": [], "cards": {}}
 
 
+def test_put_kanban_rejects_dangling_card_reference(tmp_path, monkeypatch):
+    test_db = tmp_path / "test-kanban.db"
+    monkeypatch.setattr(db, "DB_PATH", test_db)
+
+    response = client.put(
+        "/api/kanban",
+        headers={"Authorization": "Bearer dummy-token"},
+        json={
+            "columns": [{"id": "col-a", "title": "A", "cardIds": ["missing-card"]}],
+            "cards": {},
+        },
+    )
+    assert response.status_code == 422
+    assert not test_db.exists()
+
+
 def test_ai_query_requires_auth():
     response = client.post("/api/ai/query", json={"prompt": "Say hello."})
     assert response.status_code == 401
@@ -94,3 +110,52 @@ def test_ai_board_with_invalid_response(monkeypatch):
 
     assert response.status_code == 502
     assert "Unexpected OpenRouter response format" in response.json()["detail"]
+
+
+def test_ai_board_drops_invalid_suggested_board(monkeypatch):
+    class DummyResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "answer": "Moved it!",
+                                    "board": {
+                                        "columns": [
+                                            {
+                                                "id": "col-a",
+                                                "title": "A",
+                                                "cardIds": ["missing-card"],
+                                            }
+                                        ],
+                                        "cards": {},
+                                    },
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+    def fake_post(*args, **kwargs):
+        return DummyResponse()
+
+    monkeypatch.setattr("backend.ai_client.httpx.post", fake_post)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "testkey")
+
+    response = client.post(
+        "/api/ai/board",
+        headers={"Authorization": "Bearer dummy-token"},
+        json={"prompt": "Move a card.", "board": {"columns": [], "cards": {}}},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data.get("board") is None
+    assert "Moved it!" in data["answer"]
+    assert "not applied" in data["answer"]

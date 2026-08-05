@@ -9,7 +9,9 @@ RUN npm run build
 
 FROM python:3.12-slim
 WORKDIR /app
-RUN python -m pip install --no-cache-dir uvicorn fastapi python-dotenv httpx
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY backend/pyproject.toml /app/backend/pyproject.toml
+RUN uv pip install --system --no-cache -r backend/pyproject.toml
 COPY backend /app/backend
 COPY --from=frontend-builder /workspace/frontend/out /app/backend/frontend_out
 EXPOSE 8000

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +61,24 @@ DEFAULT_BOARD = {
 }
 
 
+def validate_board(board: dict[str, Any]) -> None:
+    """Raise ValueError if any column references a card that doesn't exist,
+    or the same card is referenced by more than one column."""
+    seen: set[str] = set()
+    cards = board.get("cards", {})
+    for column in board.get("columns", []):
+        for card_id in column.get("cardIds", []):
+            if card_id not in cards:
+                raise ValueError(
+                    f"Column '{column.get('id')}' references unknown card '{card_id}'"
+                )
+            if card_id in seen:
+                raise ValueError(
+                    f"Card '{card_id}' is referenced by more than one column"
+                )
+            seen.add(card_id)
+
+
 def ensure_db_exists() -> None:
     if not DB_PATH.exists():
         write_board(DEFAULT_BOARD)
@@ -71,6 +91,13 @@ def read_board() -> dict[str, Any]:
 
 
 def write_board(board: dict[str, Any]) -> None:
+    validate_board(board)
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with DB_PATH.open("w", encoding="utf-8") as handle:
-        json.dump(board, handle, indent=2)
+    fd, tmp_path = tempfile.mkstemp(dir=DB_PATH.parent, prefix=".kanban-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(board, handle, indent=2)
+        os.replace(tmp_path, DB_PATH)
+    except BaseException:
+        os.unlink(tmp_path)
+        raise

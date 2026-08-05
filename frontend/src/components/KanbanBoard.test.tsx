@@ -57,4 +57,28 @@ describe("KanbanBoard", () => {
 
     expect(within(column).queryByText("New card")).not.toBeInTheDocument();
   });
+
+  it("does not crash when a column references a missing card", () => {
+    const BrokenHarness = () => {
+      const [board, setBoard] = useState<BoardData>({
+        ...initialData,
+        columns: initialData.columns.map((column, index) =>
+          index === 0
+            ? { ...column, cardIds: [...column.cardIds, "missing-card"] }
+            : column
+        ),
+      });
+      return (
+        <KanbanBoard
+          board={board}
+          setBoard={setBoard}
+          token="test-token"
+          onLogout={() => {}}
+        />
+      );
+    };
+
+    render(<BrokenHarness />);
+    expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+  });
 });
