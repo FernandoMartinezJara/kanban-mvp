@@ -1,17 +1,31 @@
+import { useState } from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { KanbanBoard } from "@/components/KanbanBoard";
+import { initialData, type BoardData } from "@/lib/kanban";
+
+vi.mock("@/lib/api", () => ({
+  saveKanban: vi.fn().mockResolvedValue(undefined),
+  sendAIQuery: vi.fn().mockResolvedValue({ answer: "" }),
+}));
+
+const TestHarness = () => {
+  const [board, setBoard] = useState<BoardData>(initialData);
+  return (
+    <KanbanBoard board={board} setBoard={setBoard} token="test-token" onLogout={() => {}} />
+  );
+};
 
 const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
 
 describe("KanbanBoard", () => {
   it("renders five columns", () => {
-    render(<KanbanBoard />);
+    render(<TestHarness />);
     expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
   });
 
   it("renames a column", async () => {
-    render(<KanbanBoard />);
+    render(<TestHarness />);
     const column = getFirstColumn();
     const input = within(column).getByLabelText("Column title");
     await userEvent.clear(input);
@@ -20,7 +34,7 @@ describe("KanbanBoard", () => {
   });
 
   it("adds and removes a card", async () => {
-    render(<KanbanBoard />);
+    render(<TestHarness />);
     const column = getFirstColumn();
     const addButton = within(column).getByRole("button", {
       name: /add a card/i,

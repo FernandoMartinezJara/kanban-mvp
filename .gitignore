@@ -126,6 +126,9 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Local runtime data
+backend/kanban.db
+
 # Environments
 .env
 .venv
