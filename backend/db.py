@@ -65,6 +65,7 @@ def default_data() -> dict[str, Any]:
             board_id: {
                 "id": board_id,
                 "ownerId": user_id,
+                "memberIds": [],
                 "title": "Product Roadmap",
                 "createdAt": now,
                 "columns": [
@@ -228,15 +229,30 @@ def delete_session(data: dict[str, Any], token: str) -> None:
 
 
 def list_boards_for_user(data: dict[str, Any], user_id: str) -> list[dict[str, Any]]:
-    boards = [board for board in data["boards"].values() if board["ownerId"] == user_id]
+    boards = [
+        board
+        for board in data["boards"].values()
+        if board["ownerId"] == user_id or user_id in board.get("memberIds", [])
+    ]
     return sorted(boards, key=lambda board: board["createdAt"])
 
 
 def get_owned_board(data: dict[str, Any], board_id: str, user_id: str) -> dict[str, Any] | None:
+    """Return the board only if user_id is its owner (for owner-only actions like delete/share)."""
     board = data["boards"].get(board_id)
     if not board or board["ownerId"] != user_id:
         return None
     return board
+
+
+def get_accessible_board(data: dict[str, Any], board_id: str, user_id: str) -> dict[str, Any] | None:
+    """Return the board if user_id is its owner or a member it's been shared with."""
+    board = data["boards"].get(board_id)
+    if not board:
+        return None
+    if board["ownerId"] == user_id or user_id in board.get("memberIds", []):
+        return board
+    return None
 
 
 def create_board(data: dict[str, Any], user_id: str, title: str) -> dict[str, Any]:
@@ -244,6 +260,7 @@ def create_board(data: dict[str, Any], user_id: str, title: str) -> dict[str, An
     board = {
         "id": board_id,
         "ownerId": user_id,
+        "memberIds": [],
         "title": title,
         "createdAt": _now(),
         "columns": default_columns(),
@@ -251,3 +268,29 @@ def create_board(data: dict[str, Any], user_id: str, title: str) -> dict[str, An
     }
     data["boards"][board_id] = board
     return board
+
+
+def add_board_member(board: dict[str, Any], user_id: str) -> None:
+    members = board.setdefault("memberIds", [])
+    if user_id not in members:
+        members.append(user_id)
+
+
+def remove_board_member(board: dict[str, Any], user_id: str) -> None:
+    board["memberIds"] = [member_id for member_id in board.get("memberIds", []) if member_id != user_id]
+
+
+def board_response(data: dict[str, Any], board: dict[str, Any], user_id: str) -> dict[str, Any]:
+    """Augment a raw board dict with the viewer-relative fields the API response needs."""
+    owner = data["users"].get(board["ownerId"])
+    members = [
+        {"id": member_id, "username": data["users"][member_id]["username"]}
+        for member_id in board.get("memberIds", [])
+        if member_id in data["users"]
+    ]
+    return {
+        **board,
+        "isOwner": board["ownerId"] == user_id,
+        "ownerUsername": owner["username"] if owner else "unknown",
+        "members": members,
+    }

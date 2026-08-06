@@ -55,36 +55,40 @@ export const BoardSwitcher = ({
               onClick={() => onSelect(board.id)}
               aria-current={isActive}
               className="max-w-[16ch] truncate"
+              title={board.isOwner ? undefined : `Shared by ${board.ownerUsername}`}
             >
               {board.title}
+              {!board.isOwner && <span aria-hidden="true"> ⇄</span>}
             </button>
-            <button
-              type="button"
-              onClick={() => confirmDelete(board)}
-              aria-label={`Delete board ${board.title}`}
-              title="Delete board"
-              className={clsx(
-                "flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition",
-                isActive
-                  ? "text-white/70 hover:text-white"
-                  : "text-[var(--gray-text)] hover:text-[var(--navy-dark)]"
-              )}
-            >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+            {board.isOwner && (
+              <button
+                type="button"
+                onClick={() => confirmDelete(board)}
+                aria-label={`Delete board ${board.title}`}
+                title="Delete board"
+                className={clsx(
+                  "flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition",
+                  isActive
+                    ? "text-white/70 hover:text-white"
+                    : "text-[var(--gray-text)] hover:text-[var(--navy-dark)]"
+                )}
               >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
           </div>
         );
       })}

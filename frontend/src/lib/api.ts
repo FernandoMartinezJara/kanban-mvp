@@ -82,6 +82,12 @@ export const saveBoard = (
 export const deleteBoard = (token: string, boardId: string): Promise<void> =>
   apiFetch(`/api/boards/${boardId}`, token, { method: "DELETE" });
 
+export const shareBoard = (token: string, boardId: string, username: string): Promise<Board> =>
+  apiFetch(`/api/boards/${boardId}/share`, token, { method: "POST", body: { username } });
+
+export const unshareBoard = (token: string, boardId: string, memberId: string): Promise<Board> =>
+  apiFetch(`/api/boards/${boardId}/share/${memberId}`, token, { method: "DELETE" });
+
 export const sendAIBoardQuery = (
   token: string,
   boardId: string,

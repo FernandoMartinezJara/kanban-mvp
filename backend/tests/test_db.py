@@ -163,3 +163,74 @@ def test_get_owned_board_returns_none_for_unknown_board():
     data = db.default_data()
     owner_id = next(iter(data["users"]))
     assert db.get_owned_board(data, "does-not-exist", owner_id) is None
+
+
+def test_add_board_member_grants_access_and_is_idempotent():
+    data = db.default_data()
+    owner_id = next(iter(data["users"]))
+    board_id = next(iter(data["boards"]))
+    board = data["boards"][board_id]
+    member = db.create_user(data, "collaborator", "password123")
+
+    db.add_board_member(board, member["id"])
+    db.add_board_member(board, member["id"])
+
+    assert board["memberIds"] == [member["id"]]
+    assert db.get_owned_board(data, board_id, owner_id) is not None
+    assert db.get_owned_board(data, board_id, member["id"]) is None
+
+
+def test_remove_board_member_revokes_access():
+    data = db.default_data()
+    board_id = next(iter(data["boards"]))
+    board = data["boards"][board_id]
+    member = db.create_user(data, "collaborator", "password123")
+
+    db.add_board_member(board, member["id"])
+    db.remove_board_member(board, member["id"])
+
+    assert board["memberIds"] == []
+    assert db.get_accessible_board(data, board_id, member["id"]) is None
+
+
+def test_get_accessible_board_allows_owner_and_members_but_not_others():
+    data = db.default_data()
+    owner_id = next(iter(data["users"]))
+    board_id = next(iter(data["boards"]))
+    board = data["boards"][board_id]
+    member = db.create_user(data, "collaborator", "password123")
+    stranger = db.create_user(data, "stranger", "password123")
+    db.add_board_member(board, member["id"])
+
+    assert db.get_accessible_board(data, board_id, owner_id) is not None
+    assert db.get_accessible_board(data, board_id, member["id"]) is not None
+    assert db.get_accessible_board(data, board_id, stranger["id"]) is None
+
+
+def test_list_boards_for_user_includes_boards_shared_with_them():
+    data = db.default_data()
+    board_id = next(iter(data["boards"]))
+    board = data["boards"][board_id]
+    member = db.create_user(data, "collaborator", "password123")
+    db.add_board_member(board, member["id"])
+
+    boards = db.list_boards_for_user(data, member["id"])
+    assert len(boards) == 1
+    assert boards[0]["id"] == board_id
+
+
+def test_board_response_reports_ownership_and_members():
+    data = db.default_data()
+    owner_id = next(iter(data["users"]))
+    board_id = next(iter(data["boards"]))
+    board = data["boards"][board_id]
+    member = db.create_user(data, "collaborator", "password123")
+    db.add_board_member(board, member["id"])
+
+    owner_view = db.board_response(data, board, owner_id)
+    assert owner_view["isOwner"] is True
+    assert owner_view["ownerUsername"] == "user"
+    assert owner_view["members"] == [{"id": member["id"], "username": "collaborator"}]
+
+    member_view = db.board_response(data, board, member["id"])
+    assert member_view["isOwner"] is False

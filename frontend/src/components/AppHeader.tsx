@@ -1,6 +1,7 @@
 import type { Board, BoardSummary } from "@/lib/kanban";
 import { AccountMenu } from "@/components/AccountMenu";
 import { BoardSwitcher } from "@/components/BoardSwitcher";
+import { ShareBoardMenu } from "@/components/ShareBoardMenu";
 
 type AppHeaderProps = {
   username: string;
@@ -12,6 +13,8 @@ type AppHeaderProps = {
   onCreateBoard: (title: string) => void;
   onDeleteBoard: (boardId: string) => void;
   onRenameBoard: (title: string) => void;
+  onShareBoard: (username: string) => Promise<void>;
+  onUnshareBoard: (memberId: string) => Promise<void>;
   onChangePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   onLogout: () => void;
 };
@@ -26,6 +29,8 @@ export const AppHeader = ({
   onCreateBoard,
   onDeleteBoard,
   onRenameBoard,
+  onShareBoard,
+  onUnshareBoard,
   onChangePassword,
   onLogout,
 }: AppHeaderProps) => {
@@ -52,12 +57,17 @@ export const AppHeader = ({
             Current board
           </p>
           {board ? (
-            <input
-              value={board.title}
-              onChange={(event) => onRenameBoard(event.target.value)}
-              className="mt-2 w-full bg-transparent text-lg font-semibold text-[var(--primary-blue)] outline-none"
-              aria-label="Board title"
-            />
+            <>
+              <input
+                value={board.title}
+                onChange={(event) => onRenameBoard(event.target.value)}
+                className="mt-2 w-full bg-transparent text-lg font-semibold text-[var(--primary-blue)] outline-none"
+                aria-label="Board title"
+              />
+              <div className="mt-3">
+                <ShareBoardMenu board={board} onShare={onShareBoard} onUnshare={onUnshareBoard} />
+              </div>
+            </>
           ) : (
             <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
               No board selected

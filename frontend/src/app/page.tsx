@@ -16,6 +16,8 @@ import {
   logout as logoutApi,
   register as registerApi,
   saveBoard as saveBoardApi,
+  shareBoard as shareBoardApi,
+  unshareBoard as unshareBoardApi,
 } from "@/lib/api";
 import type { AuthUser } from "@/lib/api";
 import type { Board, BoardSummary } from "@/lib/kanban";
@@ -163,7 +165,13 @@ export default function Home() {
       const created = await createBoardApi(token, title);
       setBoards((prev) => [
         ...prev,
-        { id: created.id, title: created.title, createdAt: created.createdAt },
+        {
+          id: created.id,
+          title: created.title,
+          createdAt: created.createdAt,
+          isOwner: created.isOwner,
+          ownerUsername: created.ownerUsername,
+        },
       ]);
       setBoard(created);
       setSaveError(null);
@@ -202,6 +210,18 @@ export default function Home() {
     await changePasswordApi(token, currentPassword, newPassword);
   };
 
+  const handleShareBoard = async (username: string) => {
+    if (!token || !board) return;
+    const updated = await shareBoardApi(token, board.id, username);
+    setBoard(updated);
+  };
+
+  const handleUnshareBoard = async (memberId: string) => {
+    if (!token || !board) return;
+    const updated = await unshareBoardApi(token, board.id, memberId);
+    setBoard(updated);
+  };
+
   if (loading) {
     return <p className="p-8 text-center text-sm text-[var(--gray-text)]">Loading...</p>;
   }
@@ -232,6 +252,8 @@ export default function Home() {
           onCreateBoard={handleCreateBoard}
           onDeleteBoard={handleDeleteBoard}
           onRenameBoard={handleRenameBoard}
+          onShareBoard={handleShareBoard}
+          onUnshareBoard={handleUnshareBoard}
           onChangePassword={handleChangePassword}
           onLogout={handleLogout}
         />

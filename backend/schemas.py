@@ -24,16 +24,26 @@ class BoardContent(BaseModel):
     cards: Dict[str, Card]
 
 
+class UserPublic(BaseModel):
+    id: str
+    username: str
+
+
 class Board(BoardContent):
     id: str
     title: str
     createdAt: str
+    isOwner: bool
+    ownerUsername: str
+    members: List[UserPublic] = []
 
 
 class BoardSummary(BaseModel):
     id: str
     title: str
     createdAt: str
+    isOwner: bool
+    ownerUsername: str
 
 
 class BoardCreateRequest(BaseModel):
@@ -44,9 +54,8 @@ class BoardUpdateRequest(BoardContent):
     title: str = Field(min_length=1, max_length=100)
 
 
-class UserPublic(BaseModel):
-    id: str
-    username: str
+class ShareBoardRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=50)
 
 
 class RegisterRequest(BaseModel):

@@ -321,6 +321,144 @@ class TestBoards:
         response = client.delete(f"/api/boards/{board_id}", headers=auth_headers(other_token))
         assert response.status_code == 404
 
+    def test_board_summary_and_full_board_report_ownership(self):
+        token = login()["token"]
+        summary = client.get("/api/boards", headers=auth_headers(token)).json()[0]
+        assert summary["isOwner"] is True
+        assert summary["ownerUsername"] == "user"
+
+        full = client.get(f"/api/boards/{summary['id']}", headers=auth_headers(token)).json()
+        assert full["isOwner"] is True
+        assert full["ownerUsername"] == "user"
+        assert full["members"] == []
+
+
+class TestBoardSharing:
+    def _owner_and_board(self):
+        owner_token = login()["token"]
+        board_id = client.get("/api/boards", headers=auth_headers(owner_token)).json()[0]["id"]
+        return owner_token, board_id
+
+    def test_share_board_requires_auth(self):
+        _, board_id = self._owner_and_board()
+        response = client.post(f"/api/boards/{board_id}/share", json={"username": "someone"})
+        assert response.status_code == 401
+
+    def test_share_board_grants_access_to_target_user(self):
+        owner_token, board_id = self._owner_and_board()
+        collaborator_token = register("collaborator")["token"]
+
+        response = client.post(
+            f"/api/boards/{board_id}/share",
+            headers=auth_headers(owner_token),
+            json={"username": "collaborator"},
+        )
+        assert response.status_code == 200
+        assert response.json()["members"][0]["username"] == "collaborator"
+
+        shared_list = client.get("/api/boards", headers=auth_headers(collaborator_token)).json()
+        assert len(shared_list) == 1
+        assert shared_list[0]["isOwner"] is False
+        assert shared_list[0]["ownerUsername"] == "user"
+
+    def test_shared_user_can_view_and_edit_but_not_delete_or_share(self):
+        owner_token, board_id = self._owner_and_board()
+        collaborator_token = register("editor")["token"]
+        client.post(
+            f"/api/boards/{board_id}/share",
+            headers=auth_headers(owner_token),
+            json={"username": "editor"},
+        )
+
+        get_response = client.get(f"/api/boards/{board_id}", headers=auth_headers(collaborator_token))
+        assert get_response.status_code == 200
+
+        board = get_response.json()
+        put_response = client.put(
+            f"/api/boards/{board_id}",
+            headers=auth_headers(collaborator_token),
+            json={"title": "Edited by collaborator", "columns": board["columns"], "cards": board["cards"]},
+        )
+        assert put_response.status_code == 200
+        assert put_response.json()["title"] == "Edited by collaborator"
+
+        delete_response = client.delete(
+            f"/api/boards/{board_id}", headers=auth_headers(collaborator_token)
+        )
+        assert delete_response.status_code == 404
+
+        share_response = client.post(
+            f"/api/boards/{board_id}/share",
+            headers=auth_headers(collaborator_token),
+            json={"username": "user"},
+        )
+        assert share_response.status_code == 404
+
+    def test_share_board_404s_for_non_owner(self):
+        _, board_id = self._owner_and_board()
+        register("uninvolved-user")
+        intruder_token = register("share-intruder")["token"]
+
+        response = client.post(
+            f"/api/boards/{board_id}/share",
+            headers=auth_headers(intruder_token),
+            json={"username": "uninvolved-user"},
+        )
+        assert response.status_code == 404
+
+    def test_share_board_404s_for_unknown_username(self):
+        owner_token, board_id = self._owner_and_board()
+        response = client.post(
+            f"/api/boards/{board_id}/share",
+            headers=auth_headers(owner_token),
+            json={"username": "does-not-exist"},
+        )
+        assert response.status_code == 404
+
+    def test_share_board_rejects_sharing_with_self(self):
+        owner_token, board_id = self._owner_and_board()
+        response = client.post(
+            f"/api/boards/{board_id}/share",
+            headers=auth_headers(owner_token),
+            json={"username": "user"},
+        )
+        assert response.status_code == 400
+
+    def test_unshare_board_revokes_access(self):
+        owner_token, board_id = self._owner_and_board()
+        collaborator_token = register("revoked-user")["token"]
+        client.post(
+            f"/api/boards/{board_id}/share",
+            headers=auth_headers(owner_token),
+            json={"username": "revoked-user"},
+        )
+        collaborator_id = client.get("/api/auth/me", headers=auth_headers(collaborator_token)).json()["id"]
+
+        response = client.delete(
+            f"/api/boards/{board_id}/share/{collaborator_id}", headers=auth_headers(owner_token)
+        )
+        assert response.status_code == 200
+        assert response.json()["members"] == []
+
+        after_revoke = client.get(f"/api/boards/{board_id}", headers=auth_headers(collaborator_token))
+        assert after_revoke.status_code == 404
+
+    def test_unshare_board_requires_ownership(self):
+        owner_token, board_id = self._owner_and_board()
+        collaborator_token = register("cant-unshare")["token"]
+        client.post(
+            f"/api/boards/{board_id}/share",
+            headers=auth_headers(owner_token),
+            json={"username": "cant-unshare"},
+        )
+        collaborator_id = client.get("/api/auth/me", headers=auth_headers(collaborator_token)).json()["id"]
+
+        response = client.delete(
+            f"/api/boards/{board_id}/share/{collaborator_id}",
+            headers=auth_headers(collaborator_token),
+        )
+        assert response.status_code == 404
+
 
 class TestAIQuery:
     def test_ai_query_requires_auth(self):
@@ -385,6 +523,36 @@ class TestAIBoard:
             json={"prompt": "Move a card.", "boardId": "does-not-exist"},
         )
         assert response.status_code == 404
+
+    def test_ai_board_is_usable_by_a_shared_collaborator(self, monkeypatch):
+        class DummyResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"choices": [{"message": {"content": json.dumps({"answer": "Done."})}}]}
+
+        monkeypatch.setattr(
+            "backend.ai_client.httpx.post", lambda *args, **kwargs: DummyResponse()
+        )
+        monkeypatch.setenv("OPENROUTER_API_KEY", "testkey")
+
+        owner_token = login()["token"]
+        board_id = client.get("/api/boards", headers=auth_headers(owner_token)).json()[0]["id"]
+        collaborator_token = register("ai-collaborator")["token"]
+        client.post(
+            f"/api/boards/{board_id}/share",
+            headers=auth_headers(owner_token),
+            json={"username": "ai-collaborator"},
+        )
+
+        response = client.post(
+            "/api/ai/board",
+            headers=auth_headers(collaborator_token),
+            json={"prompt": "Summarize the board.", "boardId": board_id},
+        )
+        assert response.status_code == 200
+        assert response.json()["answer"] == "Done."
 
     def test_ai_board_returns_502_on_network_error(self, monkeypatch):
         def fake_post(*args, **kwargs):

@@ -101,7 +101,8 @@ def change_password(
 @app.get("/api/boards", response_model=list[schemas.BoardSummary])
 def list_boards(user: dict = Depends(get_current_user)):
     data = db.read_data()
-    return db.list_boards_for_user(data, user["id"])
+    boards = db.list_boards_for_user(data, user["id"])
+    return [db.board_response(data, board, user["id"]) for board in boards]
 
 
 @app.post("/api/boards", response_model=schemas.Board, status_code=201)
@@ -111,16 +112,16 @@ def create_board(
     data = db.read_data()
     board = db.create_board(data, user["id"], request.title.strip())
     db.write_data(data)
-    return board
+    return db.board_response(data, board, user["id"])
 
 
 @app.get("/api/boards/{board_id}", response_model=schemas.Board)
 def get_board(board_id: str, user: dict = Depends(get_current_user)):
     data = db.read_data()
-    board = db.get_owned_board(data, board_id, user["id"])
+    board = db.get_accessible_board(data, board_id, user["id"])
     if board is None:
         raise HTTPException(status_code=404, detail="Board not found")
-    return board
+    return db.board_response(data, board, user["id"])
 
 
 @app.put("/api/boards/{board_id}", response_model=schemas.Board)
@@ -130,7 +131,7 @@ def update_board(
     user: dict = Depends(get_current_user),
 ):
     data = db.read_data()
-    board = db.get_owned_board(data, board_id, user["id"])
+    board = db.get_accessible_board(data, board_id, user["id"])
     if board is None:
         raise HTTPException(status_code=404, detail="Board not found")
 
@@ -147,7 +148,7 @@ def update_board(
     board["columns"] = content["columns"]
     board["cards"] = content["cards"]
     db.write_data(data)
-    return board
+    return db.board_response(data, board, user["id"])
 
 
 @app.delete("/api/boards/{board_id}", status_code=204)
@@ -159,6 +160,40 @@ def delete_board(board_id: str, user: dict = Depends(get_current_user)):
     del data["boards"][board_id]
     db.write_data(data)
     return Response(status_code=204)
+
+
+@app.post("/api/boards/{board_id}/share", response_model=schemas.Board)
+def share_board(
+    board_id: str,
+    request: schemas.ShareBoardRequest,
+    user: dict = Depends(get_current_user),
+):
+    data = db.read_data()
+    board = db.get_owned_board(data, board_id, user["id"])
+    if board is None:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+    target = db.find_user_by_username(data, request.username)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target["id"] == user["id"]:
+        raise HTTPException(status_code=400, detail="You already own this board")
+
+    db.add_board_member(board, target["id"])
+    db.write_data(data)
+    return db.board_response(data, board, user["id"])
+
+
+@app.delete("/api/boards/{board_id}/share/{member_id}", response_model=schemas.Board)
+def unshare_board(board_id: str, member_id: str, user: dict = Depends(get_current_user)):
+    data = db.read_data()
+    board = db.get_owned_board(data, board_id, user["id"])
+    if board is None:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+    db.remove_board_member(board, member_id)
+    db.write_data(data)
+    return db.board_response(data, board, user["id"])
 
 
 @app.post("/api/ai/query", response_model=schemas.AIResponse)
@@ -177,7 +212,7 @@ def ai_query(request: schemas.AIRequest, user: dict = Depends(get_current_user))
 @app.post("/api/ai/board", response_model=schemas.AIResponse)
 def ai_board(request: schemas.AIBoardRequest, user: dict = Depends(get_current_user)):
     data = db.read_data()
-    board = db.get_owned_board(data, request.boardId, user["id"])
+    board = db.get_accessible_board(data, request.boardId, user["id"])
     if board is None:
         raise HTTPException(status_code=404, detail="Board not found")
 

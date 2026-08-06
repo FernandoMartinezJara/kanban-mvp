@@ -293,6 +293,25 @@ Criterios de éxito:
 - La búsqueda oculta tarjetas que no coinciden sin alterar los datos del tablero ni romper el drag-and-drop de las tarjetas visibles.
 - Un usuario puede cambiar su contraseña y debe volver a iniciar sesión con la nueva; la contraseña anterior deja de funcionar.
 
+## Fase 4: Compartir tableros entre usuarios
+
+Objetivo:
+- Permitir que el dueño de un tablero le dé acceso completo (ver/editar) a otros usuarios registrados, en vez de que cada tablero sea visible únicamente para su `ownerId`.
+
+Tareas:
+- `backend/db.py`: cada tablero gana `memberIds: list[str]`; nuevas funciones `add_board_member`, `remove_board_member`, `get_accessible_board` (dueño o miembro, para ver/editar/IA) que complementa a `get_owned_board` (solo dueño, para borrar/compartir/dejar de compartir); `list_boards_for_user` ahora incluye tableros propios y compartidos; `board_response` calcula por cada respuesta `isOwner`, `ownerUsername` y `members` según quién pregunta (no se guardan en el tablero, dependen del usuario que consulta).
+- Nuevos endpoints `POST /api/boards/{id}/share` (`{username}`, solo dueño, 404 si el tablero no es suyo o el username no existe, 400 si intenta compartir consigo mismo) y `DELETE /api/boards/{id}/share/{memberId}` (solo dueño).
+- `get_board`, `update_board` y `ai_board` cambian de `get_owned_board` a `get_accessible_board` para que un miembro pueda ver, editar y usar el chat AI del tablero — pero `delete_board` sigue usando `get_owned_board`, así que un miembro no puede borrar el tablero.
+- Frontend: `ShareBoardMenu` (en `AppHeader`) permite al dueño invitar por username y quitar miembros, o muestra "Shared by {ownerUsername}" si el usuario actual no es el dueño; `BoardSwitcher` oculta el ícono de borrar para tableros que no son propios.
+- Tests: aislamiento de acceso (dueño puede todo, miembro puede ver/editar/IA pero no borrar/compartir, un tercero sin acceso sigue recibiendo 404), rechazo de compartir con username inexistente o con uno mismo, revocación de acceso.
+- Tercer smoke test manual de punta a punta contra el backend real: registra un segundo usuario, comparte el tablero semilla, verifica que puede editarlo pero no borrarlo/compartirlo, confirma que el dueño ve la edición, revoca el acceso y confirma que ya no lo puede ver.
+
+Criterios de éxito:
+- El dueño de un tablero puede compartirlo por username con otro usuario registrado, y ese usuario lo ve en su lista de tableros marcado como compartido.
+- Un miembro puede editar el contenido del tablero (columnas, tarjetas, IA) pero no puede borrarlo ni gestionar quién tiene acceso.
+- Revocar el acceso hace que el tablero desaparezca de la lista del usuario removido inmediatamente.
+- Un usuario sin ninguna relación con el tablero (ni dueño ni miembro) sigue recibiendo 404 en todos los endpoints del tablero.
+
 ## Próximo paso
 
-Posibles siguientes iteraciones (no iniciadas): comentarios por tarjeta, asignar tarjetas a otro usuario o compartir un tablero entre varios usuarios (hoy cada tablero pertenece a un solo `ownerId`), invalidar otras sesiones al cambiar la contraseña, y filtros de búsqueda adicionales (por prioridad, por vencidas).
+Posibles siguientes iteraciones (no iniciadas): comentarios por tarjeta, asignar tarjetas a un miembro específico del tablero, niveles de acceso más finos (solo lectura vs edición), invalidar otras sesiones al cambiar la contraseña, y filtros de búsqueda adicionales (por prioridad, por vencidas).

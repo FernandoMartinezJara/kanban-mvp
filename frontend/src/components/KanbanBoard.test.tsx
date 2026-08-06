@@ -12,6 +12,9 @@ const testBoard: Board = {
   id: "board-test",
   title: "Test Board",
   createdAt: "2024-01-01T00:00:00Z",
+  isOwner: true,
+  ownerUsername: "test-user",
+  members: [],
   ...initialData,
 };
 

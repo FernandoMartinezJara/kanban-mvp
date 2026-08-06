@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 type MockColumn = { id: string; title: string; cardIds: string[] };
 type MockCard = {
@@ -12,6 +12,8 @@ type MockBoard = {
   id: string;
   title: string;
   createdAt: string;
+  ownerId: string;
+  memberIds: string[];
   columns: MockColumn[];
   cards: Record<string, MockCard>;
 };
@@ -20,6 +22,8 @@ const seedBoard: MockBoard = {
   id: "board-1",
   title: "Product Roadmap",
   createdAt: "2024-01-01T00:00:00.000Z",
+  ownerId: "user-1",
+  memberIds: [],
   columns: [
     { id: "col-backlog", title: "Backlog", cardIds: ["card-1", "card-2"] },
     { id: "col-discovery", title: "Discovery", cardIds: ["card-3"] },
@@ -77,6 +81,8 @@ const secondBoard: MockBoard = {
   id: "board-2",
   title: "Marketing Launch",
   createdAt: "2024-01-02T00:00:00.000Z",
+  ownerId: "user-1",
+  memberIds: [],
   columns: [
     { id: "col-backlog-2", title: "Backlog", cardIds: [] },
     { id: "col-discovery-2", title: "Discovery", cardIds: [] },
@@ -89,47 +95,84 @@ const secondBoard: MockBoard = {
 
 const mockBackend = async (page: Page, initialBoards: MockBoard[] = [seedBoard]) => {
   const boards = new Map(initialBoards.map((entry) => [entry.id, structuredClone(entry)]));
-  let nextId = boards.size + 1;
+  const users = new Map<string, string>([["user-1", "user"]]);
+  let nextBoardId = boards.size + 1;
+  let nextUserId = 2;
 
-  await page.route("**/api/auth/login", (route) =>
-    route.fulfill({ json: { token: "test-token", user: { id: "user-1", username: "user" } } })
-  );
-  await page.route("**/api/auth/register", (route) =>
-    route.fulfill({
+  const userIdFromRequest = (route: Route) => {
+    const auth = route.request().headers()["authorization"] ?? "";
+    const match = auth.match(/^Bearer token-(.+)$/);
+    return match ? match[1] : "user-1";
+  };
+
+  const boardResponse = (board: MockBoard, viewerId: string) => ({
+    ...board,
+    isOwner: board.ownerId === viewerId,
+    ownerUsername: users.get(board.ownerId) ?? "unknown",
+    members: board.memberIds.map((id) => ({ id, username: users.get(id) ?? "unknown" })),
+  });
+
+  const boardSummary = (board: MockBoard, viewerId: string) => ({
+    id: board.id,
+    title: board.title,
+    createdAt: board.createdAt,
+    isOwner: board.ownerId === viewerId,
+    ownerUsername: users.get(board.ownerId) ?? "unknown",
+  });
+
+  await page.route("**/api/auth/login", (route) => {
+    const body = route.request().postDataJSON();
+    const existing = Array.from(users.entries()).find(([, username]) => username === body.username);
+    if (!existing) {
+      return route.fulfill({ status: 401, json: { detail: "Invalid credentials" } });
+    }
+    const [id, username] = existing;
+    return route.fulfill({ json: { token: `token-${id}`, user: { id, username } } });
+  });
+  await page.route("**/api/auth/register", (route) => {
+    const body = route.request().postDataJSON();
+    if (Array.from(users.values()).includes(body.username)) {
+      return route.fulfill({ status: 409, json: { detail: "Username already taken" } });
+    }
+    const id = `user-${nextUserId++}`;
+    users.set(id, body.username);
+    return route.fulfill({
       status: 201,
-      json: { token: "test-token", user: { id: "user-1", username: "new-user" } },
-    })
-  );
-  await page.route("**/api/auth/me", (route) =>
-    route.fulfill({ json: { id: "user-1", username: "user" } })
-  );
+      json: { token: `token-${id}`, user: { id, username: body.username } },
+    });
+  });
+  await page.route("**/api/auth/me", (route) => {
+    const id = userIdFromRequest(route);
+    return route.fulfill({ json: { id, username: users.get(id) ?? "unknown" } });
+  });
   await page.route("**/api/auth/logout", (route) => route.fulfill({ status: 204, body: "" }));
   await page.route("**/api/auth/change-password", (route) => {
     const body = route.request().postDataJSON();
     if (body.currentPassword !== "password") {
       return route.fulfill({ status: 401, json: { detail: "Current password is incorrect" } });
     }
-    return route.fulfill({ json: { id: "user-1", username: "user" } });
+    const id = userIdFromRequest(route);
+    return route.fulfill({ json: { id, username: users.get(id) ?? "unknown" } });
   });
 
   await page.route("**/api/boards", (route) => {
     const method = route.request().method();
+    const userId = userIdFromRequest(route);
     if (method === "GET") {
-      return route.fulfill({
-        json: Array.from(boards.values()).map(({ id, title, createdAt }) => ({
-          id,
-          title,
-          createdAt,
-        })),
-      });
+      const visible = Array.from(boards.values()).filter(
+        (board) => board.ownerId === userId || board.memberIds.includes(userId)
+      );
+      return route.fulfill({ json: visible.map((board) => boardSummary(board, userId)) });
     }
     if (method === "POST") {
       const body = route.request().postDataJSON();
-      const id = `board-${nextId++}`;
+      const id = `board-${nextBoardId++}`;
       const created: MockBoard = {
         id,
         title: body.title,
         createdAt: new Date().toISOString(),
+        ownerId: userId,
+        memberIds: [],
         columns: [
           { id: `${id}-backlog`, title: "Backlog", cardIds: [] },
           { id: `${id}-discovery`, title: "Discovery", cardIds: [] },
@@ -140,26 +183,73 @@ const mockBackend = async (page: Page, initialBoards: MockBoard[] = [seedBoard])
         cards: {},
       };
       boards.set(id, created);
-      return route.fulfill({ status: 201, json: created });
+      return route.fulfill({ status: 201, json: boardResponse(created, userId) });
     }
     return route.continue();
+  });
+
+  await page.route("**/api/boards/*/share", (route) => {
+    const url = new URL(route.request().url());
+    const boardId = url.pathname.split("/").slice(-2, -1)[0];
+    const userId = userIdFromRequest(route);
+    const board = boards.get(boardId);
+    if (!board || board.ownerId !== userId) {
+      return route.fulfill({ status: 404, json: { detail: "Board not found" } });
+    }
+    const body = route.request().postDataJSON();
+    const target = Array.from(users.entries()).find(([, username]) => username === body.username);
+    if (!target) {
+      return route.fulfill({ status: 404, json: { detail: "User not found" } });
+    }
+    const [targetId] = target;
+    if (targetId === userId) {
+      return route.fulfill({ status: 400, json: { detail: "You already own this board" } });
+    }
+    if (!board.memberIds.includes(targetId)) {
+      board.memberIds.push(targetId);
+    }
+    return route.fulfill({ json: boardResponse(board, userId) });
+  });
+
+  await page.route("**/api/boards/*/share/*", (route) => {
+    if (route.request().method() !== "DELETE") return route.continue();
+    const url = new URL(route.request().url());
+    const segments = url.pathname.split("/");
+    const memberId = segments.pop() as string;
+    segments.pop();
+    const boardId = segments.pop() as string;
+    const userId = userIdFromRequest(route);
+    const board = boards.get(boardId);
+    if (!board || board.ownerId !== userId) {
+      return route.fulfill({ status: 404, json: { detail: "Board not found" } });
+    }
+    board.memberIds = board.memberIds.filter((id) => id !== memberId);
+    return route.fulfill({ json: boardResponse(board, userId) });
   });
 
   await page.route("**/api/boards/*", (route) => {
     const url = new URL(route.request().url());
     const id = url.pathname.split("/").pop() as string;
     const method = route.request().method();
+    const userId = userIdFromRequest(route);
 
     if (method === "GET") {
       const found = boards.get(id);
       if (!found) return route.fulfill({ status: 404, json: { detail: "Board not found" } });
-      return route.fulfill({ json: found });
+      return route.fulfill({ json: boardResponse(found, userId) });
     }
     if (method === "PUT") {
       const body = route.request().postDataJSON();
-      const updated = { ...boards.get(id), ...body, id };
-      boards.set(id, updated as MockBoard);
-      return route.fulfill({ json: updated });
+      const existing = boards.get(id) as MockBoard;
+      const updated: MockBoard = {
+        ...existing,
+        ...body,
+        id,
+        ownerId: existing.ownerId,
+        memberIds: existing.memberIds,
+      };
+      boards.set(id, updated);
+      return route.fulfill({ json: boardResponse(updated, userId) });
     }
     if (method === "DELETE") {
       boards.delete(id);
@@ -315,4 +405,61 @@ test("deletes a board", async ({ page }) => {
 
   await expect(page.getByRole("button", { name: "Marketing Launch" })).toHaveCount(0);
   await expect(page.getByLabel("Board title")).toHaveValue("Product Roadmap");
+});
+
+test("shares a board with another user, who can then see and edit it but not delete or share it", async ({
+  page,
+}) => {
+  await mockBackend(page, [seedBoard]);
+
+  // Register the collaborator account first so the owner can share by username, then log out.
+  await page.getByText(/need an account\? register/i).click();
+  await page.getByLabel("Username").fill("collaborator");
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByText("Create your first board")).toBeVisible();
+  await page.getByRole("button", { name: "Logout" }).click();
+
+  // Log in as the seeded board owner and share the board.
+  await page.getByLabel("Username").fill("user");
+  await page.getByLabel("Password").fill("password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByLabel("Board title")).toHaveValue("Product Roadmap");
+
+  await page.getByRole("button", { name: "Share board" }).click();
+  await page.getByLabel("Share with username").fill("collaborator");
+  await page.getByRole("button", { name: "Share", exact: true }).click();
+  await expect(page.getByText("collaborator")).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByText("Share board (1)")).toBeVisible();
+  await page.getByRole("button", { name: "Logout" }).click();
+
+  // Log back in as the collaborator and confirm access.
+  await page.getByLabel("Username").fill("collaborator");
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page.getByRole("button", { name: "Product Roadmap", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Board title")).toHaveValue("Product Roadmap");
+  await expect(page.getByText("Shared by user")).toBeVisible();
+  await expect(page.getByLabel("Delete board Product Roadmap")).toHaveCount(0);
+
+  const firstColumn = page.locator('[data-testid^="column-"]').first();
+  await firstColumn.getByRole("button", { name: /add a card/i }).click();
+  await firstColumn.getByPlaceholder("Card title").fill("Added by collaborator");
+  await firstColumn.getByRole("button", { name: /add card/i }).click();
+  await expect(firstColumn.getByText("Added by collaborator")).toBeVisible();
+});
+
+test("does not let a non-owner share or delete a board they were not granted access to", async ({
+  page,
+}) => {
+  await mockBackend(page, [seedBoard]);
+  await page.getByText(/need an account\? register/i).click();
+  await page.getByLabel("Username").fill("outsider");
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Create account" }).click();
+
+  await expect(page.getByText("Create your first board")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Product Roadmap" })).toHaveCount(0);
 });

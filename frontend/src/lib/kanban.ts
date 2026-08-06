@@ -21,16 +21,26 @@ export type BoardData = {
   cards: Record<string, Card>;
 };
 
+export type BoardMember = {
+  id: string;
+  username: string;
+};
+
 export type Board = BoardData & {
   id: string;
   title: string;
   createdAt: string;
+  isOwner: boolean;
+  ownerUsername: string;
+  members: BoardMember[];
 };
 
 export type BoardSummary = {
   id: string;
   title: string;
   createdAt: string;
+  isOwner: boolean;
+  ownerUsername: string;
 };
 
 export const initialData: BoardData = {
