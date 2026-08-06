@@ -245,10 +245,35 @@ Pruebas:
 ## Notas generales
 
 - Mantener la simplicidad y evitar sobreingeniería.
-- No agregar funcionalidades fuera del alcance MVP.
 - Documentar cada fase antes de avanzar.
 - Priorizar pruebas para cada etapa.
 
+## Fase 2: Multiusuario y multi-tablero
+
+Objetivo:
+- Superar el alcance original del MVP (usuario hardcodeado, un solo tablero) para soportar cuentas de usuario reales y múltiples tableros Kanban por usuario.
+
+Tareas:
+- Rediseñar `backend/db.py` para almacenar `users`, `sessions` y `boards` en el mismo archivo JSON (`kanban.db`), en vez de un único tablero.
+- Hashear contraseñas (PBKDF2-HMAC-SHA256 con salt aleatorio por usuario) — nunca texto plano.
+- Añadir endpoints `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, con tokens de sesión aleatorios (no un token dummy fijo).
+- Añadir endpoints CRUD de tableros: `GET/POST /api/boards`, `GET/PUT/DELETE /api/boards/{id}`, con verificación de propiedad (`ownerId`) — un tablero ajeno responde 404, no 403, para no filtrar su existencia.
+- Adaptar `POST /api/ai/board` para operar sobre un `boardId` (cargado desde el servidor) en vez de recibir el tablero completo del cliente.
+- Frontend: pantalla de registro/login combinada (`AuthForm`), selector de tableros (`BoardSwitcher`: crear, renombrar, eliminar, cambiar), estado vacío cuando el usuario no tiene tableros (`EmptyBoardsState`), y `AppHeader` como el nuevo contenedor del encabezado (separado de `KanbanBoard`, que ahora solo renderiza el contenido de un tablero).
+- Actualizar toda la suite de tests (backend `pytest`, frontend `vitest` + `playwright`) para el nuevo modelo, incluyendo casos de aislamiento entre usuarios (un usuario no puede leer/editar/borrar el tablero de otro).
+- Sincronizar `CLAUDE.md` y `AGENTS.md` con la arquitectura resultante.
+
+Criterios de éxito:
+- Un usuario nuevo puede registrarse, iniciar sesión, crear su primer tablero y operarlo con drag-and-drop, chat AI, etc., igual que en el MVP original.
+- Un usuario no puede ver ni modificar tableros de otro usuario (verificado con tests).
+- El usuario semilla (`user`/`password`) sigue funcionando para la demo, con su tablero original.
+
+Pruebas:
+- `backend/tests/test_db.py` y `test_main.py`: hashing/verificación de contraseñas, sesiones, CRUD de tableros, aislamiento entre usuarios, casos de error de red hacia OpenRouter.
+- `frontend/src/components/KanbanBoard.test.tsx`: adaptado al tipo `Board` (con `id`/`title`).
+- `frontend/tests/kanban.spec.ts`: registro con estado vacío, cambio entre tableros, borrado de tableros, además de los flujos de tarjetas ya existentes.
+- Smoke test manual de punta a punta contra el backend real (sin mocks) para confirmar que el contrato cliente/servidor coincide.
+
 ## Próximo paso
 
-Crear `frontend/AGENTS.md` con la descripción técnica del frontend actual como complemento del plan.
+Posibles siguientes iteraciones (no iniciadas): etiquetas/prioridades en las tarjetas, fechas de vencimiento, comentarios por tarjeta, o compartir un tablero entre varios usuarios (hoy cada tablero pertenece a un solo `ownerId`).

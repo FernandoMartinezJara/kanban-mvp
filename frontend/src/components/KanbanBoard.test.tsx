@@ -2,18 +2,22 @@ import { useState } from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { KanbanBoard } from "@/components/KanbanBoard";
-import { initialData, type BoardData } from "@/lib/kanban";
+import { initialData, type Board } from "@/lib/kanban";
 
 vi.mock("@/lib/api", () => ({
-  saveKanban: vi.fn().mockResolvedValue(undefined),
-  sendAIQuery: vi.fn().mockResolvedValue({ answer: "" }),
+  sendAIBoardQuery: vi.fn().mockResolvedValue({ answer: "" }),
 }));
 
+const testBoard: Board = {
+  id: "board-test",
+  title: "Test Board",
+  createdAt: "2024-01-01T00:00:00Z",
+  ...initialData,
+};
+
 const TestHarness = () => {
-  const [board, setBoard] = useState<BoardData>(initialData);
-  return (
-    <KanbanBoard board={board} setBoard={setBoard} token="test-token" onLogout={() => {}} />
-  );
+  const [board, setBoard] = useState<Board>(testBoard);
+  return <KanbanBoard board={board} onSave={setBoard} token="test-token" />;
 };
 
 const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
@@ -60,22 +64,15 @@ describe("KanbanBoard", () => {
 
   it("does not crash when a column references a missing card", () => {
     const BrokenHarness = () => {
-      const [board, setBoard] = useState<BoardData>({
-        ...initialData,
-        columns: initialData.columns.map((column, index) =>
+      const [board, setBoard] = useState<Board>({
+        ...testBoard,
+        columns: testBoard.columns.map((column, index) =>
           index === 0
             ? { ...column, cardIds: [...column.cardIds, "missing-card"] }
             : column
         ),
       });
-      return (
-        <KanbanBoard
-          board={board}
-          setBoard={setBoard}
-          token="test-token"
-          onLogout={() => {}}
-        />
-      );
+      return <KanbanBoard board={board} onSave={setBoard} token="test-token" />;
     };
 
     render(<BrokenHarness />);

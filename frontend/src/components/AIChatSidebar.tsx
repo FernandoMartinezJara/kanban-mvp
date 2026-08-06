@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { BoardData } from "@/lib/kanban";
-import { saveKanban, sendAIQuery } from "@/lib/api";
+import type { Board } from "@/lib/kanban";
+import { sendAIBoardQuery } from "@/lib/api";
 
 type AIChatSidebarProps = {
-  board: BoardData;
+  board: Board;
   token: string;
-  setBoard: (board: BoardData) => void;
+  onSave: (board: Board) => void;
 };
 
-export const AIChatSidebar = ({ board, token, setBoard }: AIChatSidebarProps) => {
+export const AIChatSidebar = ({ board, token, onSave }: AIChatSidebarProps) => {
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<Array<{ role: string; text: string }>>([]);
   const [loading, setLoading] = useState(false);
@@ -26,13 +26,12 @@ export const AIChatSidebar = ({ board, token, setBoard }: AIChatSidebarProps) =>
     setError(null);
 
     try {
-      const data = await sendAIQuery(token, prompt, board);
+      const data = await sendAIBoardQuery(token, board.id, prompt);
       const answer = data.answer || "No response.";
       setMessages((prev) => [...prev, { role: "assistant", text: answer }]);
 
       if (data.board) {
-        setBoard(data.board);
-        await saveKanban(token, data.board);
+        onSave({ ...board, columns: data.board.columns, cards: data.board.cards });
       }
     } catch (err) {
       setError(String(err));

@@ -11,11 +11,9 @@ This project is building a Project Management App. Key features:
 
 ## Limitations
 
-For the MVP, there will only be a user sign in (hardcoded to 'user' and 'password') but the database will support multiple users for future.
+The original MVP scope below has since been expanded: the app now supports real user registration/login (not just the hardcoded `user`/`password`, though that account still exists as a seeded demo user) and multiple Kanban boards per user, with a board switcher to create/rename/delete/select among them. See `docs/PLAN.md` Phase 2 and `CLAUDE.md` for the current architecture.
 
-For the MVP, there will only be 1 Kanban board per signed in user.
-
-For the MVP, this will run locally (in a docker container)
+This still runs locally (in a docker container); there is no real session expiry, multi-tenant isolation beyond per-user ownership checks, or production-grade auth (no JWT, no password reset, no email verification).
 
 ## Technical Decisions
 
@@ -25,7 +23,7 @@ For the MVP, this will run locally (in a docker container)
 - Use "uv" as the package manager for python in the Docker container
 - Use OpenRouter for the AI calls. An OPENROUTER_API_KEY is in .env in the project root
 - Use `openai/gpt-oss-120b` as the model
-- Use SQLLite local database for the database, creating a new db if it doesn't exist
+- Persistence: a single JSON file (`backend/kanban.db`) read/written wholesale by `backend/db.py`, creating a new db with seed data if it doesn't exist (see `CLAUDE.md` for the current schema — users/sessions/boards)
 - Start and Stop server scripts for Mac, PC, Linux in scripts/
 
 ## Starting Point

@@ -42,6 +42,7 @@ export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
         <button
           type="button"
           onClick={() => onDelete(card.id)}
+          onPointerDown={(event) => event.stopPropagation()}
           className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-transparent text-[var(--gray-text)] transition hover:border-[var(--stroke)] hover:bg-[var(--surface)] hover:text-[var(--navy-dark)]"
           aria-label={`Delete ${card.title}`}
           title="Delete card"
