@@ -6,6 +6,6 @@ echo "Stopping Project Management MVP..."
 
 cd "$(dirname "$0")/.."
 
-docker-compose down
+docker compose down
 
 echo "Application stopped."

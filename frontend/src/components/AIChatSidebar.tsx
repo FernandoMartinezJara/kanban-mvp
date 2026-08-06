@@ -43,7 +43,7 @@ export const AIChatSidebar = ({ board, token, setBoard }: AIChatSidebarProps) =>
   };
 
   return (
-    <aside className="sticky top-6 h-[calc(100vh-3rem)] min-h-[640px] rounded-[32px] border border-[var(--stroke)] bg-white/90 p-6 shadow-[var(--shadow)]">
+    <aside className="flex h-[600px] w-full flex-col rounded-[32px] border border-[var(--stroke)] bg-white/90 p-6 shadow-[var(--shadow)] lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:min-h-[640px] lg:w-[360px] lg:flex-shrink-0">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
@@ -56,7 +56,7 @@ export const AIChatSidebar = ({ board, token, setBoard }: AIChatSidebarProps) =>
         </span>
       </div>
 
-      <div className="mb-6 space-y-4 overflow-auto border-b border-[var(--stroke)] pb-4">
+      <div className="mb-6 flex-1 space-y-4 overflow-auto border-b border-[var(--stroke)] pb-4">
         {messages.length === 0 ? (
           <p className="text-sm text-[var(--gray-text)]">Ask the AI to suggest a board update or move a card.</p>
         ) : (

@@ -180,8 +180,8 @@ export const KanbanBoard = ({ board, setBoard, token, onLogout }: KanbanBoardPro
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <section className="grid gap-6 lg:grid-cols-5">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+            <section className="flex min-w-0 flex-1 gap-4 overflow-x-auto pb-2 xl:grid xl:grid-cols-5 xl:gap-6 xl:overflow-visible xl:pb-0">
               {board.columns.map((column) => (
                 <KanbanColumn
                   key={column.id}
