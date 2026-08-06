@@ -160,6 +160,17 @@ def validate_board_content(board: dict[str, Any]) -> None:
             seen.add(card_id)
 
 
+def validate_assignees(board: dict[str, Any], content: dict[str, Any]) -> None:
+    """Raise ValueError if any card is assigned to a user without access to the board."""
+    allowed = {board["ownerId"], *board.get("memberIds", [])}
+    for card in content.get("cards", {}).values():
+        assignee_id = card.get("assigneeId")
+        if assignee_id is not None and assignee_id not in allowed:
+            raise ValueError(
+                f"Card '{card.get('id')}' is assigned to a user without access to this board"
+            )
+
+
 def ensure_db_exists() -> None:
     if not DB_PATH.exists():
         write_data(default_data())

@@ -1,32 +1,33 @@
 import clsx from "clsx";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import type { Card, Column, Priority } from "@/lib/kanban";
+import type { BoardMember, Card, Column, Priority } from "@/lib/kanban";
 import { KanbanCard } from "@/components/KanbanCard";
 import { NewCardForm } from "@/components/NewCardForm";
+
+type CardChanges = { priority?: Priority; dueDate?: string | null; assigneeId?: string | null };
 
 type KanbanColumnProps = {
   column: Column;
   cards: Card[];
+  assignableUsers: BoardMember[];
   onRename: (columnId: string, title: string) => void;
   onAddCard: (
     columnId: string,
     title: string,
     details: string,
     priority: Priority,
-    dueDate: string | null
+    dueDate: string | null,
+    assigneeId: string | null
   ) => void;
   onDeleteCard: (columnId: string, cardId: string) => void;
-  onUpdateCard: (
-    columnId: string,
-    cardId: string,
-    changes: { priority?: Priority; dueDate?: string | null }
-  ) => void;
+  onUpdateCard: (columnId: string, cardId: string, changes: CardChanges) => void;
 };
 
 export const KanbanColumn = ({
   column,
   cards,
+  assignableUsers,
   onRename,
   onAddCard,
   onDeleteCard,
@@ -65,6 +66,7 @@ export const KanbanColumn = ({
             <KanbanCard
               key={card.id}
               card={card}
+              assignableUsers={assignableUsers}
               onDelete={(cardId) => onDeleteCard(column.id, cardId)}
               onUpdate={(cardId, changes) => onUpdateCard(column.id, cardId, changes)}
             />
@@ -77,8 +79,9 @@ export const KanbanColumn = ({
         )}
       </div>
       <NewCardForm
-        onAdd={(title, details, priority, dueDate) =>
-          onAddCard(column.id, title, details, priority, dueDate)
+        assignableUsers={assignableUsers}
+        onAdd={(title, details, priority, dueDate, assigneeId) =>
+          onAddCard(column.id, title, details, priority, dueDate, assigneeId)
         }
       />
     </section>

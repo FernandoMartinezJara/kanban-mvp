@@ -234,3 +234,32 @@ def test_board_response_reports_ownership_and_members():
 
     member_view = db.board_response(data, board, member["id"])
     assert member_view["isOwner"] is False
+
+
+def test_validate_assignees_accepts_owner_and_members():
+    data = db.default_data()
+    owner_id = next(iter(data["users"]))
+    board_id = next(iter(data["boards"]))
+    board = data["boards"][board_id]
+    member = db.create_user(data, "collaborator", "password123")
+    db.add_board_member(board, member["id"])
+
+    content = {
+        "cards": {
+            "card-1": {"id": "card-1", "assigneeId": owner_id},
+            "card-2": {"id": "card-2", "assigneeId": member["id"]},
+            "card-3": {"id": "card-3", "assigneeId": None},
+        }
+    }
+    db.validate_assignees(board, content)
+
+
+def test_validate_assignees_rejects_user_without_board_access():
+    data = db.default_data()
+    board_id = next(iter(data["boards"]))
+    board = data["boards"][board_id]
+    stranger = db.create_user(data, "stranger", "password123")
+
+    content = {"cards": {"card-1": {"id": "card-1", "assigneeId": stranger["id"]}}}
+    with pytest.raises(ValueError):
+        db.validate_assignees(board, content)

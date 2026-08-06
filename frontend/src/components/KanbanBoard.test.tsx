@@ -13,8 +13,9 @@ const testBoard: Board = {
   title: "Test Board",
   createdAt: "2024-01-01T00:00:00Z",
   isOwner: true,
+  ownerId: "user-test",
   ownerUsername: "test-user",
-  members: [],
+  members: [{ id: "user-collaborator", username: "collaborator" }],
   ...initialData,
 };
 
@@ -96,6 +97,27 @@ describe("KanbanBoard", () => {
     const dueDateInput = within(card).getByLabelText(/due date for align roadmap themes/i);
     await userEvent.type(dueDateInput, "2026-05-15");
     expect(dueDateInput).toHaveValue("2026-05-15");
+  });
+
+  it("creates a card with a chosen assignee and can reassign it", async () => {
+    render(<TestHarness />);
+    const column = getFirstColumn();
+    await userEvent.click(within(column).getByRole("button", { name: /add a card/i }));
+
+    await userEvent.type(within(column).getByPlaceholderText(/card title/i), "Assigned task");
+    await userEvent.selectOptions(within(column).getByLabelText("Assignee"), "test-user");
+    await userEvent.click(within(column).getByRole("button", { name: /add card/i }));
+
+    const card = within(column).getByText("Assigned task").closest("article") as HTMLElement;
+    expect(within(card).getByLabelText(/assignee for assigned task/i)).toHaveValue("user-test");
+
+    await userEvent.selectOptions(
+      within(card).getByLabelText(/assignee for assigned task/i),
+      "user-collaborator"
+    );
+    expect(within(card).getByLabelText(/assignee for assigned task/i)).toHaveValue(
+      "user-collaborator"
+    );
   });
 
   it("filters cards by search query", async () => {

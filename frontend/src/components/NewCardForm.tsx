@@ -1,18 +1,26 @@
 import { useState, type FormEvent } from "react";
-import { PRIORITY_LEVELS, type Priority } from "@/lib/kanban";
+import { PRIORITY_LEVELS, type BoardMember, type Priority } from "@/lib/kanban";
 
 const initialFormState = {
   title: "",
   details: "",
   priority: "medium" as Priority,
   dueDate: "",
+  assigneeId: "",
 };
 
 type NewCardFormProps = {
-  onAdd: (title: string, details: string, priority: Priority, dueDate: string | null) => void;
+  assignableUsers: BoardMember[];
+  onAdd: (
+    title: string,
+    details: string,
+    priority: Priority,
+    dueDate: string | null,
+    assigneeId: string | null
+  ) => void;
 };
 
-export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
+export const NewCardForm = ({ assignableUsers, onAdd }: NewCardFormProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [formState, setFormState] = useState(initialFormState);
 
@@ -25,7 +33,8 @@ export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
       formState.title.trim(),
       formState.details.trim(),
       formState.priority,
-      formState.dueDate || null
+      formState.dueDate || null,
+      formState.assigneeId || null
     );
     setFormState(initialFormState);
     setIsOpen(false);
@@ -80,6 +89,21 @@ export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
               aria-label="Due date"
               className="flex-1 rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
             />
+            <select
+              value={formState.assigneeId}
+              onChange={(event) =>
+                setFormState((prev) => ({ ...prev, assigneeId: event.target.value }))
+              }
+              aria-label="Assignee"
+              className="rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
+            >
+              <option value="">Unassigned</option>
+              {assignableUsers.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.username}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex items-center gap-2">
             <button

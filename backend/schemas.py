@@ -11,6 +11,7 @@ class Card(BaseModel):
     details: str
     priority: Priority = "medium"
     dueDate: str | None = None
+    assigneeId: str | None = None
 
 
 class Column(BaseModel):
@@ -34,6 +35,7 @@ class Board(BoardContent):
     title: str
     createdAt: str
     isOwner: bool
+    ownerId: str
     ownerUsername: str
     members: List[UserPublic] = []
 

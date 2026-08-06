@@ -429,7 +429,7 @@ test("shares a board with another user, who can then see and edit it but not del
   await page.getByRole("button", { name: "Share board" }).click();
   await page.getByLabel("Share with username").fill("collaborator");
   await page.getByRole("button", { name: "Share", exact: true }).click();
-  await expect(page.getByText("collaborator")).toBeVisible();
+  await expect(page.getByLabel("Remove collaborator from this board")).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
   await expect(page.getByText("Share board (1)")).toBeVisible();
   await page.getByRole("button", { name: "Logout" }).click();

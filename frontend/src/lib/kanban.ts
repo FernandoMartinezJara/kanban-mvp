@@ -8,6 +8,7 @@ export type Card = {
   details: string;
   priority: Priority;
   dueDate: string | null;
+  assigneeId: string | null;
 };
 
 export type Column = {
@@ -31,6 +32,7 @@ export type Board = BoardData & {
   title: string;
   createdAt: string;
   isOwner: boolean;
+  ownerId: string;
   ownerUsername: string;
   members: BoardMember[];
 };
@@ -62,6 +64,7 @@ export const initialData: BoardData = {
       details: "Draft quarterly themes with impact statements and metrics.",
       priority: "medium",
       dueDate: null,
+      assigneeId: null,
     },
     "card-2": {
       id: "card-2",
@@ -69,6 +72,7 @@ export const initialData: BoardData = {
       details: "Review support tags, sales notes, and churn feedback.",
       priority: "low",
       dueDate: null,
+      assigneeId: null,
     },
     "card-3": {
       id: "card-3",
@@ -76,6 +80,7 @@ export const initialData: BoardData = {
       details: "Sketch initial dashboard layout and key drill-downs.",
       priority: "medium",
       dueDate: null,
+      assigneeId: null,
     },
     "card-4": {
       id: "card-4",
@@ -83,6 +88,7 @@ export const initialData: BoardData = {
       details: "Standardize column labels and tone across the board.",
       priority: "high",
       dueDate: null,
+      assigneeId: null,
     },
     "card-5": {
       id: "card-5",
@@ -90,6 +96,7 @@ export const initialData: BoardData = {
       details: "Add hierarchy and spacing for scanning dense lists.",
       priority: "medium",
       dueDate: null,
+      assigneeId: null,
     },
     "card-6": {
       id: "card-6",
@@ -97,6 +104,7 @@ export const initialData: BoardData = {
       details: "Verify hover, focus, and loading states.",
       priority: "low",
       dueDate: null,
+      assigneeId: null,
     },
     "card-7": {
       id: "card-7",
@@ -104,6 +112,7 @@ export const initialData: BoardData = {
       details: "Final copy approved and asset pack delivered.",
       priority: "high",
       dueDate: null,
+      assigneeId: null,
     },
     "card-8": {
       id: "card-8",
@@ -111,6 +120,7 @@ export const initialData: BoardData = {
       details: "Document release notes and share internally.",
       priority: "low",
       dueDate: null,
+      assigneeId: null,
     },
   },
 };
@@ -228,3 +238,8 @@ export const isOverdue = (dueDate: string | null, now: Date = new Date()): boole
   }
   return new Date(`${dueDate}T23:59:59`).getTime() < now.getTime();
 };
+
+export const boardCollaborators = (board: Board): BoardMember[] => [
+  { id: board.ownerId, username: board.ownerUsername },
+  ...board.members,
+];

@@ -312,6 +312,22 @@ Criterios de éxito:
 - Revocar el acceso hace que el tablero desaparezca de la lista del usuario removido inmediatamente.
 - Un usuario sin ninguna relación con el tablero (ni dueño ni miembro) sigue recibiendo 404 en todos los endpoints del tablero.
 
+## Fase 5: Asignar tarjetas a un miembro del tablero
+
+Objetivo:
+- Permitir asignar cada tarjeta al dueño del tablero o a uno de sus miembros, para saber quién es responsable de cada tarea.
+
+Tareas:
+- `backend/schemas.py`: `Card` gana `assigneeId: str | None`; `Board` (no `BoardSummary`) gana `ownerId: str` explícito, porque el frontend necesita un id real (no solo `ownerUsername`) contra el cual asignar.
+- `backend/db.py`: nueva `validate_assignees(board, content)` — cada `assigneeId` no nulo debe ser el dueño o estar en `memberIds`, si no, `ValueError`.
+- `update_board` llama a `validate_assignees` además de `validate_board_content` (422 si falla); `ai_board` hace lo mismo antes de aceptar una sugerencia de la IA (se descarta igual que un board referencialmente roto).
+- Frontend: `kanban.ts#boardCollaborators(board)` = dueño + miembros; `KanbanCard` y `NewCardForm` ganan un select de "Assignee" con esa lista más "Unassigned".
+- Tests: validación de asignación válida/invalida en `db` y a través del endpoint, IA descartando una sugerencia con asignación inválida.
+
+Criterios de éxito:
+- Una tarjeta puede asignarse al dueño o a cualquier miembro del tablero, y reasignarse después de creada.
+- Asignar una tarjeta a alguien sin acceso al tablero es rechazado (422) tanto si lo hace un usuario como si lo sugiere la IA.
+
 ## Próximo paso
 
-Posibles siguientes iteraciones (no iniciadas): comentarios por tarjeta, asignar tarjetas a un miembro específico del tablero, niveles de acceso más finos (solo lectura vs edición), invalidar otras sesiones al cambiar la contraseña, y filtros de búsqueda adicionales (por prioridad, por vencidas).
+Posibles siguientes iteraciones (no iniciadas): comentarios por tarjeta, niveles de acceso más finos (solo lectura vs edición), invalidar otras sesiones al cambiar la contraseña, y filtros de búsqueda adicionales (por prioridad, por vencidas, por asignado).

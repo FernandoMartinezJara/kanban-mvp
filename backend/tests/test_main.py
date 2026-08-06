@@ -272,6 +272,68 @@ class TestBoards:
         )
         assert response.status_code == 422
 
+    def test_update_board_accepts_assignee_who_is_owner_or_member(self):
+        owner_token = register("assign-owner")["token"]
+        owner_id = client.get("/api/auth/me", headers=auth_headers(owner_token)).json()["id"]
+        board = client.post(
+            "/api/boards", headers=auth_headers(owner_token), json={"title": "Board"}
+        ).json()
+
+        collaborator_token = register("assign-collaborator")["token"]
+        collaborator_id = client.get(
+            "/api/auth/me", headers=auth_headers(collaborator_token)
+        ).json()["id"]
+        client.post(
+            f"/api/boards/{board['id']}/share",
+            headers=auth_headers(owner_token),
+            json={"username": "assign-collaborator"},
+        )
+
+        updated = {
+            "title": "Board",
+            "columns": [{"id": "col-a", "title": "A", "cardIds": ["card-1", "card-2"]}],
+            "cards": {
+                "card-1": {"id": "card-1", "title": "T1", "details": "D", "assigneeId": owner_id},
+                "card-2": {
+                    "id": "card-2",
+                    "title": "T2",
+                    "details": "D",
+                    "assigneeId": collaborator_id,
+                },
+            },
+        }
+        response = client.put(
+            f"/api/boards/{board['id']}", headers=auth_headers(owner_token), json=updated
+        )
+        assert response.status_code == 200
+        assert response.json()["cards"]["card-1"]["assigneeId"] == owner_id
+        assert response.json()["cards"]["card-2"]["assigneeId"] == collaborator_id
+
+    def test_update_board_rejects_assignee_without_board_access(self):
+        token = register("assign-reject-owner")["token"]
+        board = client.post(
+            "/api/boards", headers=auth_headers(token), json={"title": "Board"}
+        ).json()
+        stranger_token = register("assign-stranger")["token"]
+        stranger_id = client.get("/api/auth/me", headers=auth_headers(stranger_token)).json()["id"]
+
+        updated = {
+            "title": "Board",
+            "columns": [{"id": "col-a", "title": "A", "cardIds": ["card-1"]}],
+            "cards": {
+                "card-1": {
+                    "id": "card-1",
+                    "title": "T",
+                    "details": "D",
+                    "assigneeId": stranger_id,
+                }
+            },
+        }
+        response = client.put(
+            f"/api/boards/{board['id']}", headers=auth_headers(token), json=updated
+        )
+        assert response.status_code == 422
+
     def test_update_board_rejects_dangling_card_reference(self):
         token = register("dangling-user")["token"]
         board = client.post(
@@ -330,6 +392,7 @@ class TestBoards:
         full = client.get(f"/api/boards/{summary['id']}", headers=auth_headers(token)).json()
         assert full["isOwner"] is True
         assert full["ownerUsername"] == "user"
+        assert full["ownerId"]
         assert full["members"] == []
 
 
@@ -647,6 +710,59 @@ class TestAIBoard:
         data = response.json()
         assert data.get("board") is None
         assert "Moved it!" in data["answer"]
+        assert "not applied" in data["answer"]
+
+    def test_ai_board_drops_suggested_board_with_invalid_assignee(self, monkeypatch):
+        class DummyResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {
+                                        "answer": "Assigned it!",
+                                        "board": {
+                                            "columns": [
+                                                {"id": "col-a", "title": "A", "cardIds": ["card-1"]}
+                                            ],
+                                            "cards": {
+                                                "card-1": {
+                                                    "id": "card-1",
+                                                    "title": "T",
+                                                    "details": "D",
+                                                    "assigneeId": "someone-with-no-access",
+                                                }
+                                            },
+                                        },
+                                    }
+                                )
+                            }
+                        }
+                    ]
+                }
+
+        def fake_post(*args, **kwargs):
+            return DummyResponse()
+
+        monkeypatch.setattr("backend.ai_client.httpx.post", fake_post)
+        monkeypatch.setenv("OPENROUTER_API_KEY", "testkey")
+
+        token = login()["token"]
+        board_id = client.get("/api/boards", headers=auth_headers(token)).json()[0]["id"]
+
+        response = client.post(
+            "/api/ai/board",
+            headers=auth_headers(token),
+            json={"prompt": "Assign a card.", "boardId": board_id},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data.get("board") is None
         assert "not applied" in data["answer"]
 
     def test_ai_board_applies_valid_suggested_board(self, monkeypatch):

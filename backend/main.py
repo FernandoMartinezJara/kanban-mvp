@@ -141,6 +141,7 @@ def update_board(
     }
     try:
         db.validate_board_content(content)
+        db.validate_assignees(board, content)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -234,6 +235,7 @@ def ai_board(request: schemas.AIBoardRequest, user: dict = Depends(get_current_u
     try:
         validated_board = schemas.BoardContent(**new_board)
         db.validate_board_content(new_board)
+        db.validate_assignees(board, new_board)
     except (ValidationError, ValueError):
         return {
             "answer": f"{answer}\n\n(The suggested board update was invalid and was not applied.)"

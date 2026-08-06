@@ -31,6 +31,7 @@ describe("cardMatchesQuery", () => {
     details: "Draft quarterly themes with impact statements.",
     priority: "medium",
     dueDate: null,
+    assigneeId: null,
   };
 
   it("matches on title, case-insensitively", () => {

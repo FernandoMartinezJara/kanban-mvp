@@ -15,6 +15,7 @@ import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { AIChatSidebar } from "@/components/AIChatSidebar";
 import {
+  boardCollaborators,
   cardMatchesQuery,
   createId,
   moveCard,
@@ -73,14 +74,22 @@ export const KanbanBoard = ({ board, onSave, token }: KanbanBoardProps) => {
     title: string,
     details: string,
     priority: Priority,
-    dueDate: string | null
+    dueDate: string | null,
+    assigneeId: string | null
   ) => {
     const id = createId("card");
     onSave({
       ...board,
       cards: {
         ...board.cards,
-        [id]: { id, title, details: details || "No details yet.", priority, dueDate },
+        [id]: {
+          id,
+          title,
+          details: details || "No details yet.",
+          priority,
+          dueDate,
+          assigneeId,
+        },
       },
       columns: board.columns.map((column) =>
         column.id === columnId
@@ -110,7 +119,7 @@ export const KanbanBoard = ({ board, onSave, token }: KanbanBoardProps) => {
   const handleUpdateCard = (
     _columnId: string,
     cardId: string,
-    changes: { priority?: Priority; dueDate?: string | null }
+    changes: { priority?: Priority; dueDate?: string | null; assigneeId?: string | null }
   ) => {
     const card = board.cards[cardId];
     if (!card) return;
@@ -122,6 +131,7 @@ export const KanbanBoard = ({ board, onSave, token }: KanbanBoardProps) => {
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
   const isSearching = searchQuery.trim().length > 0;
+  const assignableUsers = useMemo(() => boardCollaborators(board), [board]);
 
   return (
     <DndContext
@@ -153,6 +163,7 @@ export const KanbanBoard = ({ board, onSave, token }: KanbanBoardProps) => {
                   key={column.id}
                   column={column}
                   cards={visibleCards}
+                  assignableUsers={assignableUsers}
                   onRename={handleRenameColumn}
                   onAddCard={handleAddCard}
                   onDeleteCard={handleDeleteCard}

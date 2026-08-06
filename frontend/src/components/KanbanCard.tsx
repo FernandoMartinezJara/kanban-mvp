@@ -1,12 +1,15 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import { isOverdue, PRIORITY_LEVELS, type Card, type Priority } from "@/lib/kanban";
+import { isOverdue, PRIORITY_LEVELS, type BoardMember, type Card, type Priority } from "@/lib/kanban";
+
+type CardChanges = { priority?: Priority; dueDate?: string | null; assigneeId?: string | null };
 
 type KanbanCardProps = {
   card: Card;
+  assignableUsers: BoardMember[];
   onDelete: (cardId: string) => void;
-  onUpdate: (cardId: string, changes: { priority?: Priority; dueDate?: string | null }) => void;
+  onUpdate: (cardId: string, changes: CardChanges) => void;
 };
 
 const PRIORITY_STYLES: Record<Priority, string> = {
@@ -15,7 +18,7 @@ const PRIORITY_STYLES: Record<Priority, string> = {
   high: "bg-[rgba(236,173,10,0.18)] text-[#8a5a00]",
 };
 
-export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
+export const KanbanCard = ({ card, assignableUsers, onDelete, onUpdate }: KanbanCardProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id });
 
@@ -106,6 +109,21 @@ export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
             isOverdue(card.dueDate) && "border-red-300 text-red-600"
           )}
         />
+        <select
+          value={card.assigneeId ?? ""}
+          onChange={(event) =>
+            onUpdate(card.id, { assigneeId: event.target.value || null })
+          }
+          aria-label={`Assignee for ${card.title}`}
+          className="min-w-0 flex-1 rounded-full border border-[var(--stroke)] bg-white px-2 py-1 text-[0.7rem] text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)]"
+        >
+          <option value="">Unassigned</option>
+          {assignableUsers.map((person) => (
+            <option key={person.id} value={person.id}>
+              {person.username}
+            </option>
+          ))}
+        </select>
       </div>
     </article>
   );
