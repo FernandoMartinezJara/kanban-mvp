@@ -83,6 +83,21 @@ def me(user: dict = Depends(get_current_user)):
     return user
 
 
+@app.post("/api/auth/change-password", response_model=schemas.UserPublic)
+def change_password(
+    request: schemas.ChangePasswordRequest, user: dict = Depends(get_current_user)
+):
+    data = db.read_data()
+    current_user = data["users"][user["id"]]
+    if not db.verify_password(
+        request.currentPassword, current_user["passwordHash"], current_user["passwordSalt"]
+    ):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    db.set_user_password(current_user, request.newPassword)
+    db.write_data(data)
+    return current_user
+
+
 @app.get("/api/boards", response_model=list[schemas.BoardSummary])
 def list_boards(user: dict = Depends(get_current_user)):
     data = db.read_data()

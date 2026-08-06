@@ -59,6 +59,26 @@ def test_hash_password_uses_random_salt_by_default():
     assert hash_a != hash_b
 
 
+def test_set_user_password_changes_the_stored_hash():
+    data = db.default_data()
+    user = next(iter(data["users"].values()))
+    old_hash = user["passwordHash"]
+
+    db.set_user_password(user, "brand-new-password")
+
+    assert user["passwordHash"] != old_hash
+    assert db.verify_password("brand-new-password", user["passwordHash"], user["passwordSalt"])
+    assert not db.verify_password("password", user["passwordHash"], user["passwordSalt"])
+
+
+def test_default_data_seeds_cards_with_priority_and_due_dates():
+    data = db.default_data()
+    board = next(iter(data["boards"].values()))
+    priorities = {card["priority"] for card in board["cards"].values()}
+    assert priorities <= {"low", "medium", "high"}
+    assert any(card["dueDate"] is not None for card in board["cards"].values())
+
+
 def test_find_user_by_username_is_case_insensitive():
     data = db.default_data()
     user = db.find_user_by_username(data, "USER")

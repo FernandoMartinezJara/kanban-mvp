@@ -1,14 +1,21 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import type { Card } from "@/lib/kanban";
+import { isOverdue, PRIORITY_LEVELS, type Card, type Priority } from "@/lib/kanban";
 
 type KanbanCardProps = {
   card: Card;
   onDelete: (cardId: string) => void;
+  onUpdate: (cardId: string, changes: { priority?: Priority; dueDate?: string | null }) => void;
 };
 
-export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
+const PRIORITY_STYLES: Record<Priority, string> = {
+  low: "bg-[var(--surface)] text-[var(--gray-text)]",
+  medium: "bg-[rgba(32,157,215,0.12)] text-[var(--primary-blue)]",
+  high: "bg-[rgba(236,173,10,0.18)] text-[#8a5a00]",
+};
+
+export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id });
 
@@ -65,6 +72,40 @@ export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
             <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
           </svg>
         </button>
+      </div>
+      <div
+        className="mt-3 flex items-center gap-2"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <select
+          value={card.priority}
+          onChange={(event) =>
+            onUpdate(card.id, { priority: event.target.value as Priority })
+          }
+          aria-label={`Priority for ${card.title}`}
+          className={clsx(
+            "rounded-full border border-transparent px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-wide outline-none",
+            PRIORITY_STYLES[card.priority]
+          )}
+        >
+          {PRIORITY_LEVELS.map((level) => (
+            <option key={level} value={level}>
+              {level}
+            </option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={card.dueDate ?? ""}
+          onChange={(event) =>
+            onUpdate(card.id, { dueDate: event.target.value || null })
+          }
+          aria-label={`Due date for ${card.title}`}
+          className={clsx(
+            "rounded-full border border-[var(--stroke)] bg-white px-2 py-1 text-[0.7rem] outline-none focus:border-[var(--primary-blue)]",
+            isOverdue(card.dueDate) && "border-red-300 text-red-600"
+          )}
+        />
       </div>
     </article>
   );

@@ -274,6 +274,25 @@ Pruebas:
 - `frontend/tests/kanban.spec.ts`: registro con estado vacío, cambio entre tableros, borrado de tableros, además de los flujos de tarjetas ya existentes.
 - Smoke test manual de punta a punta contra el backend real (sin mocks) para confirmar que el contrato cliente/servidor coincide.
 
+## Fase 3: Prioridad/fecha de vencimiento en tarjetas, búsqueda y gestión de cuenta
+
+Objetivo:
+- Añadir metadatos de tarjeta útiles para gestión de proyectos real (prioridad, fecha de vencimiento), una forma de encontrar tarjetas en tableros grandes, y autogestión básica de la cuenta (cambiar contraseña) — completando el pedido explícito de "user management" además de cuentas/login.
+
+Tareas:
+- `backend/schemas.py`: `Card` gana `priority: "low"|"medium"|"high"` (default `"medium"`) y `dueDate: str | None` (default `None`) — ambos con default, así que tableros/tarjetas guardados antes de este cambio siguen siendo válidos sin migración.
+- `backend/db.py`: seed data (`default_data()`) usa fechas de vencimiento relativas al momento de creación de la DB (una tarjeta vencida, una próxima) para que la demo muestre el estado "atrasado" sin datos hardcodeados que queden obsoletos; nuevo helper `set_user_password`.
+- Nuevo endpoint `POST /api/auth/change-password` (requiere la contraseña actual, no invalida otras sesiones activas).
+- Frontend: `NewCardForm` gana selects de prioridad y fecha de vencimiento; `KanbanCard` los vuelve editables in-place (no hay formulario de edición separado) y resalta en rojo una fecha vencida (`kanban.ts#isOverdue`); `KanbanBoard` gana una caja de búsqueda que filtra tarjetas por título/detalle en el cliente (no llama al backend) y ajusta el `SortableContext` de `@dnd-kit` a solo las tarjetas visibles; nuevo componente `AccountMenu` (dentro de `AppHeader`) para cambiar la contraseña.
+- Tests: `backend/tests/test_db.py`/`test_main.py` (round-trip de prioridad/fecha, rechazo de prioridad inválida, cambio de contraseña correcto/incorrecto/validación), `frontend/src/lib/kanban.test.ts` (`cardMatchesQuery`, `isOverdue`), `KanbanBoard.test.tsx` (crear/editar prioridad y fecha, filtrado por búsqueda), `kanban.spec.ts` (edición con estilo de vencido, búsqueda, cambio de contraseña con y sin éxito).
+- Dos smoke tests manuales de punta a punta contra el backend real (sin mocks) en esta fase y en la Fase 2, para verificar el contrato cliente/servidor tras cambios simultáneos en ambos lados.
+
+Criterios de éxito:
+- Crear o editar una tarjeta permite fijar prioridad y fecha de vencimiento, y ambas persisten tras recargar.
+- Una tarjeta con fecha de vencimiento pasada se distingue visualmente sin necesidad de abrir la tarjeta.
+- La búsqueda oculta tarjetas que no coinciden sin alterar los datos del tablero ni romper el drag-and-drop de las tarjetas visibles.
+- Un usuario puede cambiar su contraseña y debe volver a iniciar sesión con la nueva; la contraseña anterior deja de funcionar.
+
 ## Próximo paso
 
-Posibles siguientes iteraciones (no iniciadas): etiquetas/prioridades en las tarjetas, fechas de vencimiento, comentarios por tarjeta, o compartir un tablero entre varios usuarios (hoy cada tablero pertenece a un solo `ownerId`).
+Posibles siguientes iteraciones (no iniciadas): comentarios por tarjeta, asignar tarjetas a otro usuario o compartir un tablero entre varios usuarios (hoy cada tablero pertenece a un solo `ownerId`), invalidar otras sesiones al cambiar la contraseña, y filtros de búsqueda adicionales (por prioridad, por vencidas).

@@ -53,6 +53,16 @@ export const logout = (token: string): Promise<void> =>
 export const getCurrentUser = (token: string): Promise<AuthUser> =>
   apiFetch("/api/auth/me", token, { method: "GET" });
 
+export const changePassword = (
+  token: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<AuthUser> =>
+  apiFetch("/api/auth/change-password", token, {
+    method: "POST",
+    body: { currentPassword, newPassword },
+  });
+
 export const listBoards = (token: string): Promise<BoardSummary[]> =>
   apiFetch("/api/boards", token, { method: "GET" });
 

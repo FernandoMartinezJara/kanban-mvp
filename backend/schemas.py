@@ -1,12 +1,16 @@
-from typing import Dict, List
+from typing import Dict, List, Literal
 
 from pydantic import BaseModel, Field
+
+Priority = Literal["low", "medium", "high"]
 
 
 class Card(BaseModel):
     id: str
     title: str
     details: str
+    priority: Priority = "medium"
+    dueDate: str | None = None
 
 
 class Column(BaseModel):
@@ -58,6 +62,11 @@ class AuthRequest(BaseModel):
 class AuthResponse(BaseModel):
     token: str
     user: UserPublic
+
+
+class ChangePasswordRequest(BaseModel):
+    currentPassword: str
+    newPassword: str = Field(min_length=4, max_length=200)
 
 
 class AIRequest(BaseModel):

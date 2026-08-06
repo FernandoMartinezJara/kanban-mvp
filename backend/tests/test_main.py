@@ -100,6 +100,54 @@ class TestAuth:
         assert response.status_code == 401
 
 
+class TestChangePassword:
+    def test_change_password_requires_auth(self):
+        response = client.post(
+            "/api/auth/change-password",
+            json={"currentPassword": "password", "newPassword": "new-password123"},
+        )
+        assert response.status_code == 401
+
+    def test_change_password_with_correct_current_password_succeeds(self):
+        token = register("password-changer")["token"]
+        response = client.post(
+            "/api/auth/change-password",
+            headers=auth_headers(token),
+            json={"currentPassword": "password123", "newPassword": "new-password456"},
+        )
+        assert response.status_code == 200
+
+        old_login = client.post(
+            "/api/auth/login",
+            json={"username": "password-changer", "password": "password123"},
+        )
+        assert old_login.status_code == 401
+
+        new_login = client.post(
+            "/api/auth/login",
+            json={"username": "password-changer", "password": "new-password456"},
+        )
+        assert new_login.status_code == 200
+
+    def test_change_password_with_wrong_current_password_is_rejected(self):
+        token = register("wrong-password-changer")["token"]
+        response = client.post(
+            "/api/auth/change-password",
+            headers=auth_headers(token),
+            json={"currentPassword": "not-the-password", "newPassword": "new-password456"},
+        )
+        assert response.status_code == 401
+
+    def test_change_password_rejects_short_new_password(self):
+        token = register("short-password-changer")["token"]
+        response = client.post(
+            "/api/auth/change-password",
+            headers=auth_headers(token),
+            json={"currentPassword": "password123", "newPassword": "a"},
+        )
+        assert response.status_code == 422
+
+
 class TestBoards:
     def test_list_boards_requires_auth(self):
         response = client.get("/api/boards")
@@ -172,8 +220,57 @@ class TestBoards:
         assert response.status_code == 200
         assert response.json()["title"] == "Sprint Board Renamed"
 
+        card = response.json()["cards"]["card-1"]
+        assert card["priority"] == "medium"
+        assert card["dueDate"] is None
+
         refetched = client.get(f"/api/boards/{board['id']}", headers=auth_headers(token))
         assert refetched.json()["columns"][0]["title"] == "A"
+
+    def test_update_board_persists_explicit_priority_and_due_date(self):
+        token = register("priority-user")["token"]
+        board = client.post(
+            "/api/boards", headers=auth_headers(token), json={"title": "Board"}
+        ).json()
+
+        updated = {
+            "title": "Board",
+            "columns": [{"id": "col-a", "title": "A", "cardIds": ["card-1"]}],
+            "cards": {
+                "card-1": {
+                    "id": "card-1",
+                    "title": "T",
+                    "details": "D",
+                    "priority": "high",
+                    "dueDate": "2026-01-01",
+                }
+            },
+        }
+        response = client.put(
+            f"/api/boards/{board['id']}", headers=auth_headers(token), json=updated
+        )
+        assert response.status_code == 200
+        card = response.json()["cards"]["card-1"]
+        assert card["priority"] == "high"
+        assert card["dueDate"] == "2026-01-01"
+
+    def test_update_board_rejects_invalid_priority(self):
+        token = register("invalid-priority-user")["token"]
+        board = client.post(
+            "/api/boards", headers=auth_headers(token), json={"title": "Board"}
+        ).json()
+
+        updated = {
+            "title": "Board",
+            "columns": [{"id": "col-a", "title": "A", "cardIds": ["card-1"]}],
+            "cards": {
+                "card-1": {"id": "card-1", "title": "T", "details": "D", "priority": "urgent"}
+            },
+        }
+        response = client.put(
+            f"/api/boards/{board['id']}", headers=auth_headers(token), json=updated
+        )
+        assert response.status_code == 422
 
     def test_update_board_rejects_dangling_card_reference(self):
         token = register("dangling-user")["token"]

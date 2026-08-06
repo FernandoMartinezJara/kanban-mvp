@@ -6,7 +6,7 @@ import json
 import os
 import secrets
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -46,7 +46,10 @@ def default_data() -> dict[str, Any]:
     user_id = "user-1"
     board_id = "board-1"
     password_hash, salt = hash_password("password")
-    now = _now()
+    now_dt = datetime.now(timezone.utc)
+    now = now_dt.isoformat()
+    overdue_date = (now_dt - timedelta(days=2)).date().isoformat()
+    upcoming_date = (now_dt + timedelta(days=5)).date().isoformat()
     return {
         "users": {
             user_id: {
@@ -80,41 +83,57 @@ def default_data() -> dict[str, Any]:
                         "id": "card-1",
                         "title": "Align roadmap themes",
                         "details": "Draft quarterly themes with impact statements and metrics.",
+                        "priority": "medium",
+                        "dueDate": None,
                     },
                     "card-2": {
                         "id": "card-2",
                         "title": "Gather customer signals",
                         "details": "Review support tags, sales notes, and churn feedback.",
+                        "priority": "low",
+                        "dueDate": None,
                     },
                     "card-3": {
                         "id": "card-3",
                         "title": "Prototype analytics view",
                         "details": "Sketch initial dashboard layout and key drill-downs.",
+                        "priority": "medium",
+                        "dueDate": upcoming_date,
                     },
                     "card-4": {
                         "id": "card-4",
                         "title": "Refine status language",
                         "details": "Standardize column labels and tone across the board.",
+                        "priority": "high",
+                        "dueDate": overdue_date,
                     },
                     "card-5": {
                         "id": "card-5",
                         "title": "Design card layout",
                         "details": "Add hierarchy and spacing for scanning dense lists.",
+                        "priority": "medium",
+                        "dueDate": None,
                     },
                     "card-6": {
                         "id": "card-6",
                         "title": "QA micro-interactions",
                         "details": "Verify hover, focus, and loading states.",
+                        "priority": "low",
+                        "dueDate": None,
                     },
                     "card-7": {
                         "id": "card-7",
                         "title": "Ship marketing page",
                         "details": "Final copy approved and asset pack delivered.",
+                        "priority": "high",
+                        "dueDate": None,
                     },
                     "card-8": {
                         "id": "card-8",
                         "title": "Close onboarding sprint",
                         "details": "Document release notes and share internally.",
+                        "priority": "low",
+                        "dueDate": None,
                     },
                 },
             }
@@ -183,6 +202,12 @@ def create_user(data: dict[str, Any], username: str, password: str) -> dict[str,
     }
     data["users"][user_id] = user
     return user
+
+
+def set_user_password(user: dict[str, Any], new_password: str) -> None:
+    password_hash, salt = hash_password(new_password)
+    user["passwordHash"] = password_hash
+    user["passwordSalt"] = salt
 
 
 def create_session(data: dict[str, Any], user_id: str) -> str:

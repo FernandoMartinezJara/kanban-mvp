@@ -6,6 +6,7 @@ import { AuthForm } from "@/components/AuthForm";
 import { EmptyBoardsState } from "@/components/EmptyBoardsState";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import {
+  changePassword as changePasswordApi,
   createBoard as createBoardApi,
   deleteBoard as deleteBoardApi,
   getBoard,
@@ -196,6 +197,11 @@ export default function Home() {
     void persistBoard({ ...board, title });
   };
 
+  const handleChangePassword = async (currentPassword: string, newPassword: string) => {
+    if (!token) return;
+    await changePasswordApi(token, currentPassword, newPassword);
+  };
+
   if (loading) {
     return <p className="p-8 text-center text-sm text-[var(--gray-text)]">Loading...</p>;
   }
@@ -226,6 +232,7 @@ export default function Home() {
           onCreateBoard={handleCreateBoard}
           onDeleteBoard={handleDeleteBoard}
           onRenameBoard={handleRenameBoard}
+          onChangePassword={handleChangePassword}
           onLogout={handleLogout}
         />
 

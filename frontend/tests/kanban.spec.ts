@@ -1,7 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 
 type MockColumn = { id: string; title: string; cardIds: string[] };
-type MockCard = { id: string; title: string; details: string };
+type MockCard = {
+  id: string;
+  title: string;
+  details: string;
+  priority: "low" | "medium" | "high";
+  dueDate: string | null;
+};
 type MockBoard = {
   id: string;
   title: string;
@@ -22,12 +28,48 @@ const seedBoard: MockBoard = {
     { id: "col-done", title: "Done", cardIds: ["card-6"] },
   ],
   cards: {
-    "card-1": { id: "card-1", title: "Align roadmap themes", details: "Draft quarterly themes." },
-    "card-2": { id: "card-2", title: "Gather customer signals", details: "Review feedback." },
-    "card-3": { id: "card-3", title: "Prototype analytics view", details: "Sketch dashboard." },
-    "card-4": { id: "card-4", title: "Refine status language", details: "Standardize labels." },
-    "card-5": { id: "card-5", title: "QA micro-interactions", details: "Verify hover states." },
-    "card-6": { id: "card-6", title: "Ship marketing page", details: "Approve final copy." },
+    "card-1": {
+      id: "card-1",
+      title: "Align roadmap themes",
+      details: "Draft quarterly themes.",
+      priority: "medium",
+      dueDate: null,
+    },
+    "card-2": {
+      id: "card-2",
+      title: "Gather customer signals",
+      details: "Review feedback.",
+      priority: "low",
+      dueDate: null,
+    },
+    "card-3": {
+      id: "card-3",
+      title: "Prototype analytics view",
+      details: "Sketch dashboard.",
+      priority: "medium",
+      dueDate: null,
+    },
+    "card-4": {
+      id: "card-4",
+      title: "Refine status language",
+      details: "Standardize labels.",
+      priority: "high",
+      dueDate: "2026-01-01",
+    },
+    "card-5": {
+      id: "card-5",
+      title: "QA micro-interactions",
+      details: "Verify hover states.",
+      priority: "low",
+      dueDate: null,
+    },
+    "card-6": {
+      id: "card-6",
+      title: "Ship marketing page",
+      details: "Approve final copy.",
+      priority: "high",
+      dueDate: null,
+    },
   },
 };
 
@@ -62,6 +104,13 @@ const mockBackend = async (page: Page, initialBoards: MockBoard[] = [seedBoard])
     route.fulfill({ json: { id: "user-1", username: "user" } })
   );
   await page.route("**/api/auth/logout", (route) => route.fulfill({ status: 204, body: "" }));
+  await page.route("**/api/auth/change-password", (route) => {
+    const body = route.request().postDataJSON();
+    if (body.currentPassword !== "password") {
+      return route.fulfill({ status: 401, json: { detail: "Current password is incorrect" } });
+    }
+    return route.fulfill({ json: { id: "user-1", username: "user" } });
+  });
 
   await page.route("**/api/boards", (route) => {
     const method = route.request().method();
@@ -121,6 +170,59 @@ const mockBackend = async (page: Page, initialBoards: MockBoard[] = [seedBoard])
 
   await page.goto("/");
 };
+
+test("edits a card's priority and due date, flagging an overdue date", async ({ page }) => {
+  await mockBackend(page);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  const card = page.getByTestId("card-card-1");
+
+  await card.getByLabel(/priority for align roadmap themes/i).selectOption("high");
+  await expect(card.getByLabel(/priority for align roadmap themes/i)).toHaveValue("high");
+
+  const dueDateInput = card.getByLabel(/due date for align roadmap themes/i);
+  await expect(dueDateInput).not.toHaveClass(/text-red-600/);
+  await dueDateInput.fill("2020-01-01");
+  await dueDateInput.blur();
+  await expect(dueDateInput).toHaveClass(/text-red-600/);
+});
+
+test("filters cards by search query", async ({ page }) => {
+  await mockBackend(page);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  const firstColumn = page.locator('[data-testid^="column-"]').first();
+
+  await expect(firstColumn.getByText("Align roadmap themes")).toBeVisible();
+  await expect(firstColumn.getByText("Gather customer signals")).toBeVisible();
+
+  await page.getByLabel("Search cards").fill("roadmap");
+
+  await expect(firstColumn.getByText("Align roadmap themes")).toBeVisible();
+  await expect(firstColumn.getByText("Gather customer signals")).not.toBeVisible();
+});
+
+test("changes the account password", async ({ page }) => {
+  await mockBackend(page);
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await page.getByRole("button", { name: "Change password" }).click();
+  await page.getByLabel("Current password").fill("password");
+  await page.getByLabel("New password").fill("new-password123");
+  await page.getByRole("button", { name: "Update" }).click();
+
+  await expect(page.getByText("Password updated.")).toBeVisible();
+});
+
+test("shows an error when the current password is wrong", async ({ page }) => {
+  await mockBackend(page);
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await page.getByRole("button", { name: "Change password" }).click();
+  await page.getByLabel("Current password").fill("wrong-password");
+  await page.getByLabel("New password").fill("new-password123");
+  await page.getByRole("button", { name: "Update" }).click();
+
+  await expect(page.getByText("Current password is incorrect")).toBeVisible();
+});
 
 test("loads the kanban board", async ({ page }) => {
   await mockBackend(page);

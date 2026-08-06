@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import type { Card, Column } from "@/lib/kanban";
+import type { Card, Column, Priority } from "@/lib/kanban";
 import { KanbanCard } from "@/components/KanbanCard";
 import { NewCardForm } from "@/components/NewCardForm";
 
@@ -9,8 +9,19 @@ type KanbanColumnProps = {
   column: Column;
   cards: Card[];
   onRename: (columnId: string, title: string) => void;
-  onAddCard: (columnId: string, title: string, details: string) => void;
+  onAddCard: (
+    columnId: string,
+    title: string,
+    details: string,
+    priority: Priority,
+    dueDate: string | null
+  ) => void;
   onDeleteCard: (columnId: string, cardId: string) => void;
+  onUpdateCard: (
+    columnId: string,
+    cardId: string,
+    changes: { priority?: Priority; dueDate?: string | null }
+  ) => void;
 };
 
 export const KanbanColumn = ({
@@ -19,6 +30,7 @@ export const KanbanColumn = ({
   onRename,
   onAddCard,
   onDeleteCard,
+  onUpdateCard,
 }: KanbanColumnProps) => {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
 
@@ -48,12 +60,13 @@ export const KanbanColumn = ({
         </div>
       </div>
       <div className="mt-4 flex max-h-[50vh] flex-1 flex-col gap-3 overflow-y-auto pr-1">
-        <SortableContext items={column.cardIds} strategy={verticalListSortingStrategy}>
+        <SortableContext items={cards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
           {cards.map((card) => (
             <KanbanCard
               key={card.id}
               card={card}
               onDelete={(cardId) => onDeleteCard(column.id, cardId)}
+              onUpdate={(cardId, changes) => onUpdateCard(column.id, cardId, changes)}
             />
           ))}
         </SortableContext>
@@ -64,7 +77,9 @@ export const KanbanColumn = ({
         )}
       </div>
       <NewCardForm
-        onAdd={(title, details) => onAddCard(column.id, title, details)}
+        onAdd={(title, details, priority, dueDate) =>
+          onAddCard(column.id, title, details, priority, dueDate)
+        }
       />
     </section>
   );

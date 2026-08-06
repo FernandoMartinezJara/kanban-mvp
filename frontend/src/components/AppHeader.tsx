@@ -1,4 +1,5 @@
 import type { Board, BoardSummary } from "@/lib/kanban";
+import { AccountMenu } from "@/components/AccountMenu";
 import { BoardSwitcher } from "@/components/BoardSwitcher";
 
 type AppHeaderProps = {
@@ -11,6 +12,7 @@ type AppHeaderProps = {
   onCreateBoard: (title: string) => void;
   onDeleteBoard: (boardId: string) => void;
   onRenameBoard: (title: string) => void;
+  onChangePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   onLogout: () => void;
 };
 
@@ -24,6 +26,7 @@ export const AppHeader = ({
   onCreateBoard,
   onDeleteBoard,
   onRenameBoard,
+  onChangePassword,
   onLogout,
 }: AppHeaderProps) => {
   return (
@@ -33,6 +36,9 @@ export const AppHeader = ({
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
             Signed in as {username}
           </p>
+          <div className="mt-2">
+            <AccountMenu onChangePassword={onChangePassword} />
+          </div>
           <h1 className="mt-3 font-display text-4xl font-semibold text-[var(--navy-dark)]">
             Kanban Studio
           </h1>
